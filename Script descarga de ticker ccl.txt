@@ -1,0 +1,198 @@
+# --- 1. Instalación de Librerías (para Google Colab) ---
+# Descomentar y ejecutar si es la primera vez que usas estas librerías en Colab
+# !pip install yfinance pandas numpy matplotlib scipy
+
+# --- 2. Importación de Librerías ---
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from scipy.optimize import minimize
+import logging
+from datetime import datetime, timedelta
+from scipy.stats import norm
+
+# Configuración de logging para un manejo más robusto de errores de descarga
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- 3. Definición de Inputs (según el video y tus especificaciones) ---
+print("--- Configurador de Portafolios ---")
+tickers_input = input("Ingrese los tickers separados por coma (máximo 500): ")
+years_history_str = input("Años de historia a analizar (ejemplo: 5): ")
+risk_free_rate_str = input("Tasa libre de riesgo anual (%) (ejemplo: 2): ")
+target_portfolio_return_str = input("Retorno anual objetivo para el portfolio (%) (opcional, ej: 10): ")
+min_weight_str = input("Peso mínimo para cada activo en % (opcional, ENTER para omitir): ")
+
+# --- 4. Procesamiento y Validación de Inputs ---
+try:
+    tickers = [ticker.strip().upper() for ticker in tickers_input.split(',') if ticker.strip()]
+    if not tickers:
+        raise ValueError("No se ingresaron tickers válidos.")
+    if len(tickers) > 500:
+        print("Advertencia: Se han ingresado más de 500 tickers. Se procesarán los primeros 50.")
+        tickers = tickers[:500]
+
+    years_history = int(years_history_str)
+    if years_history <= 0:
+        raise ValueError("Los años de historia deben ser un número positivo.")
+
+    risk_free_rate_annual = float(risk_free_rate_str) / 100.0
+    if not (0 <= risk_free_rate_annual <= 1):
+         print("Advertencia: La tasa libre de riesgo es inusual. Asegúrese de que sea un porcentaje razonable (ej. 2 para 2%).")
+
+    target_portfolio_return_annual = float(target_portfolio_return_str) / 100.0 if target_portfolio_return_str else None
+    if target_portfolio_return_annual is not None and not (0 <= target_portfolio_return_annual <= 1):
+        print("Advertencia: El retorno objetivo es inusual. Asegúrese de que sea un porcentaje razonable (ej. 10 para 10%).")
+
+    min_weight_per_asset = float(min_weight_str) / 100.0 if min_weight_str else 0.0
+    if min_weight_per_asset < 0 or min_weight_per_asset > 1:
+        raise ValueError("El peso mínimo para cada activo debe estar entre 0 y 100%.")
+
+except ValueError as e:
+    print(f"\nError en la entrada de datos: {e}")
+    print("Por favor, reinicie el programa e ingrese los datos correctamente.")
+    exit()
+
+print("\n--- Iniciando análisis de portafolios ---")
+print(f"Tickers a analizar: {', '.join(tickers)}")
+print(f"Años de historia: {years_history}")
+print(f"Tasa libre de riesgo: {risk_free_rate_annual:.2%}")
+if target_portfolio_return_annual:
+    print(f"Retorno objetivo: {target_portfolio_return_annual:.2%}")
+if min_weight_per_asset > 0:
+    print(f"Peso mínimo por activo: {min_weight_per_asset:.2%}")
+
+# --- 5. Descarga de Datos Históricos con yfinance (Lógica Reforzada) ---
+import warnings
+# Suprimir FutureWarning de yfinance para un output más limpio
+warnings.filterwarnings("ignore", category=FutureWarning, module='yfinance.download')
+warnings.filterwarnings("ignore", category=FutureWarning, module='yfinance.utils')
+
+# Función para descargar datos de un solo ticker con manejo de errores
+def download_single_ticker_data(ticker, start_date, end_date):
+    try:
+        # Usamos auto_adjust=False para obtener 'Close' y 'Adj Close' por separado,
+        # lo que es crucial si necesitamos el precio de cierre sin ajustar para el CCL.
+        data = yf.download(ticker, start=start_date, end=end_date, auto_adjust=True, progress=False)
+        if data.empty:
+            logging.warning(f"No hay datos para {ticker} en el rango especificado. Intentando descargar sin rango.")
+            data = yf.download(ticker, auto_adjust=True, progress=False)
+
+        # yfinance 0.2.x+ descarga en un DataFrame con MultiIndex. Extraemos la serie de precios.
+        if isinstance(data.columns, pd.MultiIndex):
+            if 'Close' in data.columns:
+                prices_series = data['Close'].copy()
+            elif 'Adj Close' in data.columns:
+                prices_series = data['Adj Close'].copy()
+            else:
+                logging.warning(f"Ni 'Adj Close' ni 'Close' encontrados para {ticker}.")
+                return pd.Series(dtype=float)
+        elif 'Close' in data.columns: # Caso de un solo ticker sin MultiIndex
+            prices_series = data['Close'].copy()
+        elif 'Adj Close' in data.columns:
+            prices_series = data['Adj Close'].copy()
+        else:
+            logging.warning(f"Ni 'Adj Close' ni 'Close' encontrados para {ticker}.")
+            return pd.Series(dtype=float)
+
+        return prices_series.dropna().astype(np.float64)
+    except Exception as e:
+        logging.error(f"Error al descargar {ticker}: {str(e)}")
+        return pd.Series()
+
+logging.info("Descargando datos...")
+price_data = pd.DataFrame()
+valid_tickers = []
+pesos_tickers = [t for t in tickers if t.endswith('.BA')]
+usd_tickers = [t for t in tickers if not t.endswith('.BA')]
+
+# --- MEJORA: Merval como Benchmark Obligatorio y corrección de la definición ---
+# Definir los benchmarks de forma incondicional para evitar el NameError
+benchmark_tickers = ['SPY', 'QQQ', '^MERV']
+merval_ticker = '^MERV'
+ccl_ref_pesos = 'GGAL.BA'
+ccl_ref_adr = 'GGAL'
+
+# La lista de tickers a dolarizar incluye todos los .BA y el ^MERV
+tickers_to_dolarize = pesos_tickers + [merval_ticker]
+
+# La lista de tickers de referencia para el CCL
+ccl_ref_tickers = [ccl_ref_pesos, ccl_ref_adr]
+
+# Aseguramos que la lista de descarga incluya todos los tickers necesarios
+all_tickers_to_download = list(set(tickers + benchmark_tickers + ccl_ref_tickers))
+
+end_date_dt = datetime.now()
+start_date_dt = end_date_dt - pd.DateOffset(years=years_history)
+START_DATE_STR = start_date_dt.strftime("%Y-%m-%d")
+END_DATE_STR = end_date_dt.strftime("%Y-%m-%d")
+
+# Descargar todos los tickers necesarios
+for tkr in all_tickers_to_download:
+    s = download_single_ticker_data(tkr, START_DATE_STR, END_DATE_STR)
+    if not s.empty and len(s) > 1:
+        price_data[tkr] = s
+        valid_tickers.append(tkr)
+        logging.info(f"{tkr}: {len(s)} registros descargados.")
+    else:
+        logging.warning(f"{tkr} descartado debido a datos insuficientes o error de descarga.")
+
+if price_data.empty:
+    raise SystemExit("\nNo hay datos válidos para ningún activo después de la descarga. Terminando programa.")
+
+# --- DOLARIZACIÓN DE TICKERS EN PESOS (.BA y ^MERV) ---
+# Se verifica si se necesitan tickers a dolarizar antes de iniciar el proceso.
+if tickers_to_dolarize:
+    logging.info("\nIniciando dolarización de tickers en pesos...")
+
+    # Verificar si los tickers de referencia del CCL fueron descargados
+    if ccl_ref_pesos not in price_data.columns or ccl_ref_adr not in price_data.columns:
+        raise SystemExit(f"Error: No se pudieron descargar los tickers de referencia ({ccl_ref_pesos} y {ccl_ref_adr}) para calcular el dólar CCL. Terminando programa.")
+
+    # Alinear los precios de GGAL.BA y GGAL y eliminar días sin cotización doble
+    ccl_data = price_data[[ccl_ref_pesos, ccl_ref_adr]].dropna()
+
+    # Calcular la serie del dólar CCL con la fórmula proporcionada
+    ccl_rate_series = (ccl_data[ccl_ref_pesos] * 10) / ccl_data[ccl_ref_adr]
+
+    # Crear un DataFrame para almacenar los precios dolarizados
+    dolarized_prices = pd.DataFrame(index=ccl_rate_series.index)
+
+    # Dolarizar cada ticker en pesos (incluyendo el Merval)
+    for tkr_to_dolarize in tickers_to_dolarize:
+        if tkr_to_dolarize in price_data.columns:
+            pesos_series_aligned = price_data[tkr_to_dolarize].reindex(ccl_rate_series.index).dropna()
+            dolarized_prices[tkr_to_dolarize] = pesos_series_aligned / ccl_rate_series.reindex(pesos_series_aligned.index)
+            logging.info(f"Ticker {tkr_to_dolarize} dolarizado al CCL.")
+
+    # --- CORRECCIÓN CRÍTICA DE CONCATENACIÓN ---
+    # Se crea una lista con todos los tickers que NO necesitan dolarización
+    # y que fueron descargados exitosamente.
+    non_dolarized_tickers = [t for t in all_tickers_to_download if t not in tickers_to_dolarize]
+
+    # Se alinean los precios de esos tickers con el índice de fechas del CCL
+    non_dolarized_prices_aligned = price_data[non_dolarized_tickers].reindex(ccl_rate_series.index)
+
+    # Se concatenan los DataFrames de precios no dolarizados y dolarizados
+    prices = pd.concat([non_dolarized_prices_aligned, dolarized_prices], axis=1).dropna(how='all')
+
+    logging.info("Proceso de dolarización y alineación completado. Precios limpios.")
+
+else:
+    # Si no hay tickers en pesos o Merval, simplemente usar los precios descargados
+    prices = price_data.ffill().bfill().dropna(how='any')
+
+if prices.empty:
+    raise SystemExit("No quedan datos utilizables después de alinear y limpiar. Revise los tickers o el período de tiempo.")
+
+# Asegurarse de que las listas de tickers contengan solo los que sobrevivieron a la limpieza
+tickers = [t for t in tickers if t in prices.columns]
+benchmark_tickers = [t for t in benchmark_tickers if t in prices.columns]
+# Recalcular la lista de todos los tickers para los siguientes pasos
+all_tickers_for_analysis = list(set(tickers + benchmark_tickers))
+
+print(f"\nActivos válidos para el análisis: {len(tickers)}/{len(tickers_input.split(','))}")
+print(f"Datos históricos: {len(prices)} días")
+print("Previsualización de los precios (últimas 5 filas):")
+print(prices.tail())
