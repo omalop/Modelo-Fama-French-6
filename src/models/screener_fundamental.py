@@ -434,10 +434,10 @@ def run_screener(filename, mode, output_name):
 
 def main():
     # 1. Ranking Global
-    run_screener('ticker.txt', 'global', 'Ranking_Global_Top.xlsx')
+    run_screener('config/ticker.txt', 'global', 'data/processed/Ranking_Global_Top.xlsx')
     
     # 2. Ranking Argentina
-    run_screener('ticker_arg.txt', 'argentina', 'Ranking_Argentina_Top.xlsx')
+    run_screener('config/ticker_arg.txt', 'argentina', 'data/processed/Ranking_Argentina_Top.xlsx')
     
     print("\n" + "="*50)
     print("PROCESO FINALIZADO. REVISE LOS ARCHIVOS OUTPUT.")

@@ -469,7 +469,7 @@ if __name__ == "__main__":
     
     # Cargar tickers
     try:
-        with open('ticker.txt', 'r') as f:
+        with open('config/ticker.txt', 'r') as f:
             content = f.read()
             tickers = [t.strip().upper() for t in content.replace('\n', ',').split(',') if t.strip()]
     except:

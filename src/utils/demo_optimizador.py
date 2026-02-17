@@ -1,3 +1,7 @@
+import sys
+import os
+# Agregar el directorio de modelos al path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'models')))
 
 from optimizador_cartera import GestorBlackLitterman
 import pandas as pd

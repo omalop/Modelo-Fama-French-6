@@ -10,18 +10,37 @@ Este repositorio implementa un sistema de inversión "Quantamental" que combina 
 *   **Backtesting Engine:** Módulo para simular el rendimiento histórico de la estrategia.
 *   **Integración Local (Argentina):** Capacidad para verificar liquidez en mercados locales (BYMA/Rofex).
 
-## 📋 Requisitos
+## 📁 Estructura del Proyecto
 
-*   Python 3.9+
-*   Librerías principales: `pandas`, `numpy`, `yfinance`, `scipy`, `statsmodels`, `openpyxl`, `matplotlib`.
+Siguiendo el **Artículo 7** de la constitución, el proyecto se organiza de la siguiente manera:
 
-```bash
-pip install pandas numpy yfinance scipy statsmodels openpyxl matplotlib requests
+```text
+Modelo Fama-French 6/
+├── config/                  # Archivos de configuración y listas de tickers
+│   ├── ticker.txt           # Lista de activos globales
+│   └── ticker_arg.txt       # Lista de activos argentinos
+├── data/                    # Almacenamiento de datos (ignorado en git excepto estructura)
+│   ├── raw/                 # Datos crudos (no procesados)
+│   ├── interim/             # Datos en proceso de transformación
+│   └── processed/           # Rankings y resultados finales (Excel)
+├── docs/                    # Documentación científica y manuales
+│   ├── metodologia.md       # Fundamento científico del modelo
+│   ├── manual_usuario.txt   # Guía de uso
+│   └── ...
+├── src/                     # Código fuente
+│   ├── data/                # Scripts de ETL y validación
+│   ├── models/              # Modelos cuantitativos (Screener, Backtest, Optimizador)
+│   └── utils/               # Utilidades (Inspección, Sincronización GitHub)
+├── tests/                   # Pruebas unitarias e integración
+├── logs/                    # Registros de ejecución
+└── requirements.txt         # Versiones exactas de librerías
 ```
+
+## 📋 Requisitos
 
 ## ⚙️ Configuración
 
-1.  **Lista de Activos:** Edita el archivo `ticker.txt` e incluye los símbolos (Yahoo Finance) que deseas analizar, uno por línea o separados por comas.
+1.  **Lista de Activos:** Edita el archivo `config/ticker.txt` e incluye los símbolos (Yahoo Finance) que deseas analizar, uno por línea o separados por comas.
     *   Ejemplo: `AAPL, MSFT, GOOGL, YPF, GGAL`
 
 ## 🖥️ Uso
@@ -31,26 +50,32 @@ El sistema es modular y permite ejecutar pasos individuales o el flujo completo.
 ### 1. Screening Fundamental
 Genera un ranking de los mejores activos basándose en su "Esperanza Matemática" (Z-Scores de factores).
 ```bash
-python screener_fundamental.py
+python src/models/screener_fundamental.py
 ```
-*   **Salida:** `Ranking_Fundamental_Top50.xlsx`
+*   **Salida:** `data/processed/Ranking_Global_Top.xlsx`
 
 ### 2. Optimización de Cartera
 Calcula la asignación de capital ideal para una lista de activos seleccionados.
 ```bash
-python optimizador_cartera.py
+python src/models/optimizador_cartera.py
 ```
 
 ### 3. Backtesting
 Simula la estrategia en el pasado para validar su robustez.
 ```bash
-python backtest_quantamental.py
+python src/models/backtest_quantamental.py
 ```
 
 ### 4. Análisis Técnico Rápido
 Genera un reporte de indicadores técnicos (Semáforos, ADX, Túneles) sin el análisis fundamental pesado.
 ```bash
-python "script deteccion momentum domenec.py"
+python "src/models/script deteccion momentum domenec.py"
+```
+
+### 5. Sincronización GitHub
+Actualiza el repositorio remoto con los cambios locales.
+```bash
+python src/utils/git_sync.py
 ```
 
 ### Ejecución Completa
@@ -58,6 +83,9 @@ Para correr el pipeline entero (Descarga -> Análisis -> Ranking -> Optimizació
 ```bash
 python main.py
 ```
+
+> **Nota Pendiente:** El archivo `main.py` para la ejecución automatizada del pipeline completo está programado para ser desarrollado una vez finalizado el periodo de pruebas actual.
+
 
 ## 📊 Interpretación de Resultados
 
