@@ -102,83 +102,92 @@ class DBManager:
             )
         """)
 
-    def _is_cache_valid(self):
-        """Verifica si el caché tiene menos de 24 horas."""
+    def _get_outdated_tickers(self, tickers):
+        """Identifica qué tickers necesitan actualización (faltantes o >24h)."""
+        if not tickers: return []
+        
+        # 1. Obtener tickers que ya existen y su timestamp
+        tickers_str = "'" + "','".join(tickers) + "'"
         try:
-            result = self.conn.execute("SELECT last_updated FROM metadata WHERE key='market_data'").fetchone()
-            if not result:
-                return False
-            
-            last_updated = result[0]
-            # DuckDB devuelve datetime, procedemos a comparar
-            if (datetime.now() - last_updated) < timedelta(hours=24):
-                return True
-            return False
-        except Exception as e:
-            logger.warning(f"Error verificando caché: {e}")
-            return False
+            query = f"SELECT ticker, last_updated FROM tickers_metadata WHERE ticker IN ({tickers_str})"
+            existing = self.conn.execute(query).df()
+        except:
+            return tickers # Si falla la query, asumir todos outdated
+        
+        existing_dict = existing.set_index('ticker')['last_updated'].to_dict()
+        
+        outdated = []
+        now = datetime.now()
+        
+        for t in tickers:
+            if t not in existing_dict:
+                outdated.append(t)
+            else:
+                last_upd = existing_dict[t]
+                # Verificar TTL 24h
+                if (now - last_upd) > timedelta(hours=24):
+                    outdated.append(t)
+                    
+        return outdated
 
-    def _clear_cache(self):
-        """Borra todos los datos para una recarga limpia."""
-        logger.info("Invalidando caché (murió el TTL de 24h)...")
-        # Borramos datos volátiles, pero podríamos conservar metadatos estáticos si quisiéramos.
-        # Por simplicidad, refrescamos todo.
-        self.conn.execute("DELETE FROM prices")
-        self.conn.execute("DELETE FROM financials")
-        self.conn.execute("DELETE FROM tickers_metadata")
-        self.conn.execute("DELETE FROM metadata WHERE key='market_data'")
-
+    def _delete_data_for_tickers(self, tickers):
+        """Borra datos de precios y fundamentales para una lista de tickers."""
+        if not tickers: return
+        
+        logger.info(f"Limpiando datos previos para {len(tickers)} tickers...")
+        tickers_str = "'" + "','".join(tickers) + "'"
+        
+        self.conn.execute(f"DELETE FROM prices WHERE ticker IN ({tickers_str})")
+        self.conn.execute(f"DELETE FROM financials WHERE ticker IN ({tickers_str})")
+        # No borramos metadata aun, se reemplazará al insertar
+        
     def update_history(self, tickers: list, source: str = 'yfinance'):
         """
-        Actualiza la base de datos.
+        Actualiza la base de datos solo para los tickers que lo necesiten.
         Args:
             tickers: Lista de tickers
             source: 'yfinance' o 'sec'
         """
-        if self._is_cache_valid():
-            logger.info("Caché válido (<24h). Usando datos locales.")
-            return
-
-        # Si llegamos acá, hay que actualizar
-        self._clear_cache()
-        
-        # Deduplicar lista de tickers para evitar Primary Key Constraint Errors
+        # Deduplicar
         tickers = sorted(list(set(tickers)))
         
-        logger.info(f"Actualizando caché para {len(tickers)} tickers únicos...")
+        # 1. Verificar qué tickers necesitan update
+        tickers_to_update = self._get_outdated_tickers(tickers)
         
-        # 1. Descarga Masiva de Precios (Mucho más rápido con yfinance.download group)
-        # Limitamos historial a lo necesario para Fama-French Screener (ej. 2-5 años)
-        # Para backtest, quizás necesitemos más, pero el screener es el uso principal diario.
-        # User pidió "descargar datos nuevos".
-        # En estrategia "Borrar y Cargar", descargamos "max" o "5y" según necesidad.
-        # Usaremos "5y" como default robusto para análisis de mediano plazo.
+        if not tickers_to_update:
+            logger.info(f"Todos los {len(tickers)} tickers están actualizados (Cache < 24h).")
+            return
+
+        logger.info(f"Actualizando {len(tickers_to_update)} tickers (Fuente: {source.upper()})...")
+        
+        # 2. Limpiar datos viejos de esos tickers
+        self._delete_data_for_tickers(tickers_to_update)
         
         try:
-            # Descarga optimizada en batch
+            # 3. Descargar Precios (Batch para los tickers a actualizar)
+            # Usamos tickers_to_update para la descarga
             logger.info("Descargando precios (Batch)...")
             # threads=False para evitar conflictos con curl_cffi/requests session en algunos entornos (ej. tests)
-            df_prices = yf.download(tickers, period="5y", group_by='ticker', auto_adjust=True, threads=False, progress=False)
+            df_prices = yf.download(tickers_to_update, period="5y", group_by='ticker', auto_adjust=True, threads=False, progress=False)
             
             # Procesar y guardar precios
-            # El formato de yf.download con group_by='ticker' es MultiIndex (Ticker, OHLC) si hay >1 ticker
-            # Ojo: si es 1 solo ticker, el formato es diferente.
-            
             batch_data = []
             
-            if len(tickers) == 1:
-                ticker = tickers[0]
+            # Caso 1: Un solo ticker (yf devuelve DataFrame simple, no MultiIndex)
+            if len(tickers_to_update) == 1:
+                ticker = tickers_to_update[0]
                 df = df_prices
-                # Reset index para tener Date como columna
-                df = df.reset_index()
-                for _, row in df.iterrows():
-                    batch_data.append((
-                        ticker, row['Date'], 
-                        row['Open'], row['High'], row['Low'], row['Close'], row['Volume']
-                    ))
+                if not df.empty:
+                    df = df.reset_index()
+                    for _, row in df.iterrows():
+                        batch_data.append((
+                            ticker, row['Date'], 
+                            row['Open'], row['High'], row['Low'], row['Close'], row['Volume']
+                        ))
+            
+            # Caso 2: Múltiples tickers (MultiIndex)
             else:
-                for ticker in tickers:
-                    # Acceder al nivel superior del MultiIndex
+                for ticker in tickers_to_update:
                     if ticker not in df_prices.columns.get_level_values(0):
                         continue
                         
@@ -197,30 +206,27 @@ class DBManager:
             
             # Insertar Precios en Batch
             if batch_data:
-                # Usamos INSERT OR IGNORE para que si un ticker viene duplicado o con fechas solapadas, no explote.
                 self.conn.executemany(
                     "INSERT OR IGNORE INTO prices VALUES (?, ?, ?, ?, ?, ?, ?)",
                     batch_data
                 )
                 logger.info(f"Insertados {len(batch_data)} registros de precios.")
 
-            # 2. Descarga de Fundamentales y Metadatos
+            # 4. Descarga de Fundamentales y Metadatos
             logger.info(f"Descargando fundamentales (Fuente: {source.upper()})...")
             financials_data = []
             metadata_records = []
             
+            # Usamos tickers_to_update para iterar
             if source == 'sec':
                 # --- LOGICA SEC ---
                 try:
                     downloader = SECDownloader(user_agent=SEC_USER_AGENT)
-                    total = len(tickers)
-                    for i, ticker in enumerate(tickers):
+                    total = len(tickers_to_update)
+                    for i, ticker in enumerate(tickers_to_update):
                         if i % 5 == 0: print(f"SEC Download {i}/{total} ({ticker})...", end='\r')
                         
                         # A. Metadatos básicos (desde yfinance para complementar)
-                        # SEC no da sector/shares facilmente en companyfacts, usamos yf.Ticker.info rapido
-                        # OJO: Si yf falla, poner default.
-                        # OJO: Si yf falla, poner default.
                         try:
                             t_yf = yf.Ticker(ticker)
                             info = t_yf.info
@@ -245,8 +251,8 @@ class DBManager:
 
             else:
                 # --- LOGICA YFINANCE (Legado) ---
-                total = len(tickers)
-                for i, ticker in enumerate(tickers):
+                total = len(tickers_to_update)
+                for i, ticker in enumerate(tickers_to_update):
                     if i % 10 == 0: print(f"YF Download {i}/{total} ({ticker})...", end='\r')
                     try:
                         t = yf.Ticker(ticker)
@@ -284,7 +290,7 @@ class DBManager:
                         logger.debug(f"Error procesando {ticker}: {e}")
                         continue
             
-            # Insertar Metadatos
+            # Insertar Metadatos (con timestamp actual)
             if metadata_records:
                 self.conn.executemany(
                     "INSERT OR REPLACE INTO tickers_metadata VALUES (?, ?, ?, ?, ?)",
@@ -300,11 +306,7 @@ class DBManager:
                 )
                 logger.info(f"Insertados {len(financials_data)} registros fundamentales.")
 
-            # Marcar como actualizado
-            self.conn.execute(
-                "INSERT INTO metadata (key, value, last_updated) VALUES ('market_data', 'full_load', current_timestamp)"
-            )
-            logger.info("Actualización de caché completada con éxito.")
+            logger.info("Actualización parcial completada con éxito.")
             
         except Exception as e:
             logger.error(f"Error crítico actualizando DB: {e}")
