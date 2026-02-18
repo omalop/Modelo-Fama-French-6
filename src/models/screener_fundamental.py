@@ -18,6 +18,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore")
 
+# Import DB Manager relative to this file
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+try:
+    from src.data.db_manager import DBManager
+except ImportError:
+    logger.error("No se pudo importar src.data.db_manager. Verifique PYTHONPATH.")
+    sys.exit(1)
+
 # ==============================================================================
 # 1. INDICADORES TÉCNICOS (Metodología Domenec)
 # ==============================================================================
@@ -136,9 +146,10 @@ class FamaFrenchCalculator:
     - Momentum (WML) Multifractal (Domenec)
     """
     
-    def __init__(self, tickers, mode='global'):
+    def __init__(self, tickers, mode='global', source='yfinance'):
         self.tickers = tickers
         self.mode = mode
+        self.source = source
         self.data_store = []
         
         # Configuración de Temporalidades para Momentum
@@ -155,115 +166,176 @@ class FamaFrenchCalculator:
         }
     
     def fetch_data(self):
-        """Descarga fundamentales y técnicos multicapa."""
+        """Descarga fundamentales y técnicos usando DBManager (Caché Diario)."""
         logger.info(f"Iniciando análisis ({self.mode.upper()}) para {len(self.tickers)} activos...")
         
+        # 1. Inicializar y Actualizar DB
+        try:
+            db = DBManager()
+            db.update_history(self.tickers, source=self.source)
+        except Exception as e:
+            logger.error(f"Error crítico en DBManager: {e}")
+            return
+
+        # 2. Recuperar Datos Bulk (Eficiencia)
+        logger.info("Recuperando datos desde DB local...")
+        try:
+            # Precios
+            df_prices_all = db.get_price_history(self.tickers)
+            if not df_prices_all.empty:
+                df_prices_all['date'] = pd.to_datetime(df_prices_all['date'])
+            
+            # Fundamentales
+            df_financials_all = db.get_financials(self.tickers)
+            if not df_financials_all.empty:
+                df_financials_all['report_date'] = pd.to_datetime(df_financials_all['report_date'])
+            
+            # Metadatos
+            df_meta_all = db.get_tickers_metadata(self.tickers)
+            
+            db.close() # Liberar conexión
+            
+        except Exception as e:
+            logger.error(f"Error recuperando datos de DB: {e}")
+            return
+
+        # 3. Procesamiento Ticker por Ticker (Lógica de Negocio)
         total = len(self.tickers)
         for i, ticker in enumerate(self.tickers):
             print(f"[{i+1}/{total}] Procesando {ticker}...", end='\r')
             try:
-                t = yf.Ticker(ticker)
-                
-                # --- A. FUNDAMENTALES (Fama-French Classic Fix) ---
-                try:
-                    info = t.info
-                    bs = t.balance_sheet
-                    fin = t.financials
-                    
-                    if bs.empty or fin.empty:
-                        logger.warning(f"{ticker}: Sin datos fundamentales. Omitiendo.")
-                        continue
-
-                    # Filtro Diviza (Global Mode)
-                    if self.mode == 'global':
-                        fc = info.get('financialCurrency')
-                        c = info.get('currency')
-                        if fc and c and fc != c:
-                            # Permitir si es consistente USD/USD, sino warning
-                            continue
-                            
-                    # 1. VALUE (Book-to-Market)
-                    # Intentar varias claves para Equity
-                    equity_keys = ['Total Stockholder Equity', 'Total Equity Gross Minority Interest', 'Stockholders Equity']
-                    book_value = None
-                    for k in equity_keys:
-                        if k in bs.index:
-                            book_value = bs.loc[k].iloc[0]
-                            break
-                    
-                    if book_value is None: continue
-                    
-                    mkt_cap = info.get('marketCap')
-                    if not mkt_cap:
-                        price = info.get('currentPrice') or info.get('regularMarketPreviousClose')
-                        shares = info.get('sharesOutstanding')
-                        if price and shares: mkt_cap = price * shares
-                    
-                    if not mkt_cap: continue
-                    
-                    bm_ratio = book_value / mkt_cap
-                    
-                    # 2. PROFITABILITY (Operating Profitability)
-                    # Op Income / Book Equity
-                    op_income = 0
-                    if 'Operating Income' in fin.index:
-                        op_income = fin.loc['Operating Income'].iloc[0]
-                    elif 'Ebit' in fin.index: # Approx
-                        op_income = fin.loc['Ebit'].iloc[0]
-                        
-                    profitability = op_income / book_value if book_value != 0 else np.nan
-                    
-                    # 3. INVESTMENT (Asset Growth)
-                    # (At - At-1) / At-1
-                    asset_growth = np.nan
-                    if 'Total Assets' in bs.index:
-                        assets = bs.loc['Total Assets']
-                        if len(assets) >= 2:
-                            at = assets.iloc[0]
-                            at1 = assets.iloc[1]
-                            asset_growth = (at - at1) / at1
-
-                except Exception as eval_e:
-                    logger.debug(f"{ticker}: Error en fundamentales: {eval_e}")
+                # --- A. METADATOS & FILTROS ---
+                meta_rows = df_meta_all[df_meta_all['ticker'] == ticker]
+                if meta_rows.empty:
+                    # logger.warning(f"{ticker}: Sin metadatos. Omitiendo.")
                     continue
+                meta = meta_rows.iloc[0]
+                
+                sector = meta['sector']
+                currency = meta['currency']
+                shares = meta['shares']
+                
+                # Filtro Divisa (Global Mode)
+                if self.mode == 'global':
+                    # Asumimos que si currency != USD es ADR o local raro, filtrar si es necesario.
+                    # Por ahora solo warning si es muy exótico, pero la lógica original era 'financialCurrency' vs 'currency'.
+                    # info() de yfinance a veces trae basura. Simplificamos: Si no es USD, ojo.
+                    pass 
 
-                # --- B. MOMENTUM MULTIFRACTAL (Domenec) ---
-                # Descarga independiente por TF
-                mom_scores = []
-                dispersions = []
+                # --- B. PRECIOS (MOMENTUM & MKT CAP) ---
+                hist = df_prices_all[df_prices_all['ticker'] == ticker].copy()
+                if hist.empty: continue
                 
-                # Vamos a usar 3 temporalidades robustas: 1mo (Mensual/Trimestral proxy), 1wk, 1d
-                # yfinance '3mo' interval is valid? Documentation says: 1m,2m,5m,15m,30m,60m,90m,1h,1d,5d,1wk,1mo,3mo
-                # Probemos 3mo. Si falla, fallback.
+                # Formato compatible con indicadores
+                hist.rename(columns={
+                    'date': 'Date', 'open': 'Open', 'high': 'High', 
+                    'low': 'Low', 'close': 'Close', 'volume': 'Volume'
+                }, inplace=True)
+                hist.set_index('Date', inplace=True)
+                hist.sort_index(inplace=True)
                 
-                tfs_to_process = ['3mo', '1mo', '1wk', '1d']
+                price = hist['Close'].iloc[-1]
+                mkt_cap = price * shares if shares > 0 else 0
+                
+                if mkt_cap == 0: continue
+
+                # --- C. FUNDAMENTALES (VALUE, PROF, INV) ---
+                fin_rows = df_financials_all[df_financials_all['ticker'] == ticker]
+                if fin_rows.empty: continue
+                
+                # Reconstruir DataFrames anchos (Wide) para lógica legado
+                # Pivotar: index=metric, columns=report_date
+                
+                # Balance Sheet
+                bs_data = fin_rows[fin_rows['type'] == 'BS']
+                bs = bs_data.pivot(index='metric', columns='report_date', values='value')
+                
+                # Income Statement
+                is_data = fin_rows[fin_rows['type'] == 'IS']
+                fin = is_data.pivot(index='metric', columns='report_date', values='value')
+                
+                # Ordenar columnas por fecha descendente (más reciente primero)
+                bs = bs[sorted(bs.columns, reverse=True)]
+                fin = fin[sorted(fin.columns, reverse=True)]
+
+                # 1. VALUE (Book-to-Market)
+                equity_keys = ['Total Stockholder Equity', 'Total Equity Gross Minority Interest', 'Stockholders Equity']
+                book_value = None
+                for k in equity_keys:
+                    if k in bs.index:
+                        book_value = bs.loc[k].iloc[0]
+                        break
+                
+                if book_value is None: continue
+                bm_ratio = book_value / mkt_cap
+
+                # 2. PROFITABILITY (Operating Profitability)
+                op_income = 0
+                if 'Operating Income' in fin.index:
+                    op_income = fin.loc['Operating Income'].iloc[0]
+                elif 'Ebit' in fin.index:
+                    op_income = fin.loc['Ebit'].iloc[0]
+                    
+                profitability = op_income / book_value if book_value != 0 else np.nan
+                
+                # 3. INVESTMENT (Asset Growth)
+                asset_growth = np.nan
+                if 'Total Assets' in bs.index:
+                    assets = bs.loc['Total Assets']
+                    if len(assets) >= 2:
+                        at = assets.iloc[0]
+                        at1 = assets.iloc[1]
+                        asset_growth = (at - at1) / at1
+
+                # --- D. MOMENTUM MULTIFRACTAL (Domenec) ---
+                # Recalcular indicadores sobre 'hist' recuperado de DB
+                # Nota: 'hist' de DB tiene '5y' diarios.
+                # Para TFs mayores (1wk, 1mo), hacemos resample.
                 
                 tf_status = {}
                 
-                for tf_name in tfs_to_process:
-                    try:
-                        cfg = self.timeframes.get(tf_name, {'interval': '1d', 'period': '1y'})
-                        # Descarga
-                        hist = t.history(period=cfg['period'], interval=cfg['interval'], auto_adjust=True)
-                        
-                        if hist.empty:
-                            tf_status[tf_name] = {'status': 0, 'disp': 0}
-                            continue
-                            
-                        # Calcular Status Domenec
-                        status_val = get_domenec_status(hist)
-                        disp_val = calculate_dispersion_sma34(hist)
-                        
-                        tf_status[tf_name] = {'status': status_val, 'disp': disp_val}
-                        
-                    except Exception as e_tf:
-                        logger.debug(f"{ticker}: Error TF {tf_name}: {e_tf}")
-                        tf_status[tf_name] = {'status': 0, 'disp': 0}
+                # 1. Diario (1d)
+                try:
+                    status_1d = get_domenec_status(hist)
+                    disp_1d = calculate_dispersion_sma34(hist)
+                    tf_status['1d'] = {'status': status_1d, 'disp': disp_1d}
+                except:
+                    tf_status['1d'] = {'status': 0, 'disp': 0}
+
+                # 2. Semanal (1wk) - Resample
+                try:
+                    hist_wk = hist.resample('W').agg({
+                        'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+                    }).dropna()
+                    status_1wk = get_domenec_status(hist_wk)
+                    tf_status['1wk'] = {'status': status_1wk}
+                except:
+                    tf_status['1wk'] = {'status': 0}
+
+                # 3. Mensual (1mo) - Resample (Proxy de CP/LP)
+                try:
+                    hist_mo = hist.resample('ME').agg({
+                        'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+                    }).dropna()
+                    status_1mo = get_domenec_status(hist_mo)
+                    tf_status['1mo'] = {'status': status_1mo}
+                except:
+                    tf_status['1mo'] = {'status': 0}
+
+                # 4. Trimestral (3mo) - Resample (Proxy Macro)
+                try:
+                    hist_3mo = hist.resample('QE').agg({
+                        'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'
+                    }).dropna()
+                    status_3mo = get_domenec_status(hist_3mo)
+                    tf_status['3mo'] = {'status': status_3mo}
+                except:
+                    tf_status['3mo'] = {'status': 0}
 
                 # Guardar Datos
                 self.data_store.append({
                     'Ticker': ticker,
-                    'Sector': info.get('sector', 'Unknown'),
+                    'Sector': sector,
                     'MarketCap': mkt_cap,
                     
                     # FF Factors
@@ -280,7 +352,7 @@ class FamaFrenchCalculator:
                 })
                 
             except Exception as e:
-                logger.error(f"Error fatal procesando {ticker}: {e}")
+                logger.error(f"Error procesando {ticker}: {e}")
 
     def calculate_scores(self):
         """Calcula Scores Finales usando lógica Fama-French Corregida + Domenec Refinado."""
@@ -400,7 +472,7 @@ class FamaFrenchCalculator:
         
         return df
 
-def run_screener(filename, mode, output_name):
+def run_screener(filename, mode, output_name, source='yfinance'):
     print(f"\n>>> PROCESANDO LISTA: {mode.upper()} ({filename})")
     try:
         with open(filename, 'r') as f:
@@ -410,7 +482,7 @@ def run_screener(filename, mode, output_name):
         print(f"Error: {filename} no encontrado.")
         return
 
-    screener = FamaFrenchCalculator(tickers, mode=mode)
+    screener = FamaFrenchCalculator(tickers, mode=mode, source=source)
     screener.fetch_data()
     df_results = screener.calculate_scores()
     
@@ -433,11 +505,14 @@ def run_screener(filename, mode, output_name):
         print(df_results.head().to_string())
 
 def main():
-    # 1. Ranking Global
-    run_screener('config/ticker.txt', 'global', 'data/processed/Ranking_Global_Top.xlsx')
+    # 1. Ranking SEC (EE.UU. - Fuente Oficial)
+    run_screener('config/ticker_sec.txt', 'global_sec', 'data/processed/Ranking_Global_SEC_Top.xlsx', source='sec')
+
+    # 2. Ranking Global (Resto del Mundo - Fuente YFinance)
+    run_screener('config/ticker_global.txt', 'global_intl', 'data/processed/Ranking_Global_Intl_Top.xlsx', source='yfinance')
     
-    # 2. Ranking Argentina
-    run_screener('config/ticker_arg.txt', 'argentina', 'data/processed/Ranking_Argentina_Top.xlsx')
+    # 3. Ranking Argentina (Local - Fuente YFinance)
+    run_screener('config/ticker_arg.txt', 'argentina', 'data/processed/Ranking_Argentina_Top.xlsx', source='yfinance')
     
     print("\n" + "="*50)
     print("PROCESO FINALIZADO. REVISE LOS ARCHIVOS OUTPUT.")

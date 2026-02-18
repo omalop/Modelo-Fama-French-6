@@ -28,3 +28,9 @@ venv.bak/
 # IDE
 .vscode/
 .idea/
+
+# Database
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+*.db

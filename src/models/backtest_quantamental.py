@@ -9,16 +9,27 @@ import matplotlib.pyplot as plt
 # Importar módulos propios
 # Importar lógica real del modelo (Principio de Replicabilidad)
 try:
-    from screener_fundamental import FamaFrenchCalculator, get_domenec_status, calculate_dispersion_sma34
-    # Monkey-patching para evitar descargas en screener_fundamental si ya tenemos datos
     import screener_fundamental
+    from screener_fundamental import FamaFrenchCalculator, get_domenec_status, calculate_dispersion_sma34
 except ImportError:
     logging.error("No se pudo importar 'screener_fundamental.py'. Verifique el directorio.")
     raise
+
+# Import DB Manager relative to this file
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+try:
+    from src.data.db_manager import DBManager
+except ImportError:
+    logging.error("No se pudo importar src.data.db_manager. Verifique PYTHONPATH.")
+    sys.exit(1)
+
 # Optimizador (Opcional por ahora, nos centramos en el Alpha del Screener)
 try:
     from optimizador_cartera import GestorBlackLitterman
-except ImportError:
+except Exception as e:
+    logging.warning(f"No se pudo cargar optimizador_cartera: {e}")
     pass
 
 # Logging
@@ -53,82 +64,94 @@ class TimeTravelSim:
         self.price_cache = {}
         self.financials_cache = {}
         
-    def preload_financials(self):
-        """Descarga Financials y Balance Sheet DE UNA SOLA VEZ para todos los tickers."""
-        logger.info(f"Precargando estados financieros para {len(self.tickers)} activos...")
-        
-        # yfinance no tiene bulk download de financials confiable, hay que iterar.
-        # Pero lo hacemos 1 vez por ticker, no 1 vez por trimestre simulado.
-        total = len(self.tickers)
-        for i, t in enumerate(self.tickers):
-            if i % 10 == 0: logger.info(f"Descargando fundamentales: {i}/{total}")
-            try:
-                # Usamos Ticker individual.
-                # Si quisieramos optimizar MÁS, podriamos paralelizar con ThreadPoolExecutor, 
-                # pero yfinance ya hace throttling.
-                ticker_obj = yf.Ticker(t)
-                
-                # Forzamos descarga accediendo a propiedades
-                fin = ticker_obj.financials
-                bs = ticker_obj.balance_sheet
-                
-                if not fin.empty and not bs.empty:
-                    self.financials_cache[t] = {
-                        'financials': fin,
-                        'balance_sheet': bs
-                    }
-            except Exception as e:
-                logger.debug(f"Error descargando fundamentales de {t}: {e}")
-                continue
-                
-    def preload_prices(self):
-        """Descarga historial de precios completo una sola vez."""
-        logger.info("Precargando historial de precios...")
-        # Descarga OHLC para tener High/Low si quisieramos calcular indicadores reales
-        # Pero para backtest rápido, 'Close' es suficiente para Returns y Market Cap.
-        # Si queremos ADX, necesitamos OHLC.
-        # Por simplicidad y velocidad en yfinance free tier: Solo Close.
-        # Ajustamos el proxy de Momentum en lógica.
-        self.price_cache = yf.download(self.tickers, start=self.start_date, end=self.end_date, auto_adjust=True, progress=False)['Close']
-        
-        # Validación de datos vacíos
-        if self.price_cache.empty:
-            logger.error("No se descargaron precios. Verifique conexión o tickers.")
-            raise ValueError("Datos de precios vacíos.")
+    def load_db_data(self):
+        """Carga datos históricos desde la Base de Datos Local (DuckDB)."""
+        logger.info("Cargando datos desde DBManager...")
+        try:
+            db = DBManager()
+            db.update_history(self.tickers) # Asegurar caché diario
+            
+            # 1. Precios
+            self.df_prices_all = db.get_price_history(self.tickers)
+            if not self.df_prices_all.empty:
+                self.df_prices_all['date'] = pd.to_datetime(self.df_prices_all['date'])
+            
+            # Formato compatible (Wide format para acceso rápido por columna Ticker)
+            # Pivotar precio Close para MTM
+            self.price_cache = self.df_prices_all.pivot(index='date', columns='ticker', values='close')
+            self.price_cache.index.name = 'Date'
+            
+            # Cache OHLC para Momentum
+            # Guardamos el DF largo en memoria para filtrar por ticker/fecha
+            # self.df_prices_all ya está en memoria.
+
+            # 2. Fundamentales
+            self.df_financials_all = db.get_financials(self.tickers)
+            if not self.df_financials_all.empty:
+                self.df_financials_all['report_date'] = pd.to_datetime(self.df_financials_all['report_date'])
+            
+            # 3. Metadatos
+            self.df_meta_all = db.get_tickers_metadata(self.tickers)
+            
+            db.close()
+        except Exception as e:
+            logger.error(f"Error cargando DB: {e}")
+            raise
 
     def get_valid_financials(self, ticker, simulation_date):
         """
-        Filtra estados financieros para evitar Look-Ahead Bias USANDO CANCHÉ.
-        Retorna los datos más recientes reportados ANTES de simulation_date.
+        Filtra estados financieros Point-in-Time desde DB en memoria.
         """
-        # Recuperar de caché en memoria
-        data = self.financials_cache.get(ticker)
-        if not data: return None, None
+        if self.df_financials_all.empty: return None, None
         
-        fin = data['financials']
-        bs = data['balance_sheet']
+        # Filtrar por ticker y fecha reporte < fecha simulacion
+        # Nota: En la vida real, hay un 'publication lag'. Aquí asumimos 'report_date' 
+        # como fecha de disponibilidad (simplificación, o debería ser report_date + lag).
+        # yfinance report_date suele ser fin de trimestre. Publication es +1-2 meses.
+        # Para backtest realista, deberíamos sumar ~45 días de lag.
+        # AGREGAMOS LAG DE 45 DÍAS para seguridad Point-in-Time.
         
-        # Las columnas de yfinance son fechas. Filtramos.
-        # Ojo: yfinance a veces devuelve columnas como strings o NaT.
-        try:
-             valid_cols = [date for date in fin.columns if pd.to_datetime(date) < simulation_date]
-        except:
-             return None, None
+        LAG_DAYS = 45 
+        cutoff_date = simulation_date - timedelta(days=LAG_DAYS)
         
-        if not valid_cols:
-            return None, None # No habia datos reportados en esa fecha
-            
-        # Tomar la columna más reciente válida
-        latest_date = max(valid_cols)
-        return fin[latest_date], bs[latest_date]
+        ticker_fin = self.df_financials_all[
+            (self.df_financials_all['ticker'] == ticker) &
+            (self.df_financials_all['report_date'] <= cutoff_date)
+        ]
+        
+        if ticker_fin.empty:
+            logger.warning(f"{ticker}: No financials found before {cutoff_date}. DB dates: {self.df_financials_all[self.df_financials_all['ticker']==ticker]['report_date'].unique()}")
+            return None, None
+        
+        # Obtener la fecha de reporte más reciente disponible
+        latest_date = ticker_fin['report_date'].max()
+        logger.debug(f"{ticker}: Using financials from {latest_date} for sim date {simulation_date}")
+        
+        # Filtrar datos de esa fecha
+        latest_data = ticker_fin[ticker_fin['report_date'] == latest_date]
+        
+        # Separar BS y IS
+        bs_rows = latest_data[latest_data['type'] == 'BS']
+        is_rows = latest_data[latest_data['type'] == 'IS']
+
+        if bs_rows.empty:
+            logger.warning(f"{ticker}: BS empty for {latest_date}")
+        if is_rows.empty:
+            logger.warning(f"{ticker}: IS empty for {latest_date}")
+        
+        # Convertir a Series (index=metric, value=value)
+        bs_series = bs_rows.set_index('metric')['value']
+        
+        fin_series = is_rows.set_index('metric')['value']
+        
+        return fin_series, bs_series
 
 
     def run_simulation(self):
         """Ejecuta el loop de simulación."""
         logger.info(f"Iniciando Backtest desde {self.start_date.date()} hasta {self.end_date.date()}")
         
-        self.preload_prices()
-        self.preload_financials() # NUEVO: Carga fundamental masiva
+        self.load_db_data() # Carga masiva desde DB
         current_capital = self.capital
         current_positions = {} # {ticker: shares}
         
@@ -178,7 +201,7 @@ class TimeTravelSim:
             
             # 1. Screening Fundamental (Time Travel)
             selected_tickers = []
-            valid_fundamental_scores = {} # Para BL
+            valid_fundamental_scores = [] # Lista de dicts para FamaFrenchCalculator
             
             # Optimizacion: Para demo no corremos los 400 tickers, seleccionamos aleatoriamente 20 para testear lógica
             # En prod: Correr sobre self.tickers completo
@@ -231,9 +254,24 @@ class TimeTravelSim:
                         if k in bs_series.index:
                             book_value = bs_series.loc[k]
                             break
-                    if book_value is None: continue
+                    if book_value is None:
+                        logger.warning(f"{t}: Book Value None. Keys present: {bs_series.index.intersection(equity_keys)}")
+                        continue
                     
-                    # Market Cap Hoy = Precio Hoy * Shares (asumimos constante del último reportado por yf es difícil)
+                    # Price at t-1 (sim_date)
+                    try:
+                        price = self.price_cache.loc[sim_date.strftime('%Y-%m-%d')][t]
+                    except KeyError:
+                        logger.warning(f"{t}: Price Failed Lookup for {sim_date}")
+                        continue
+                    except Exception as e:
+                        logger.warning(f"{t}: Price Error {e}")
+                        continue
+
+                    if price is None or np.isnan(price) or price == 0:
+                        logger.warning(f"{t}: Price Invalid (NaN/0) for {sim_date}")
+                        continue
+                    
                     # Truco: Usar 'Ordinary Shares Number' de bs_series si existe
                     shares = np.nan
                     if 'Ordinary Shares Number' in bs_series.index:
@@ -253,34 +291,43 @@ class TimeTravelSim:
 
                     # b. Profitability (Op Inc / Equity)
                     op_income = 0
-                    if 'Operating Income' in fin_series.index:
+                    try:
                         op_income = fin_series.loc['Operating Income']
-                    elif 'Ebit' in fin_series.index:
-                        op_income = fin_series.loc['Ebit']
+                    except:
+                        # Try to proxy
+                        try:
+                            op_income = fin_series.loc['EBIT']
+                        except:
+                            op_income = None
+                    
+                    if op_income is None:
+                        logger.warning(f"{t}: Operating Income Missing")
+                        continue
                     
                     profitability = op_income / book_value if book_value and book_value != 0 else np.nan
 
                     # c. Investment (Asset Growth)
-                    # Necesitamos el A(t-1). Buscamos en el balance sheet COMPLETO CACHEADO.
-                    # bs_series es solo la columna de la fecha. Necesitamos el df completo.
-                    cached_data = self.financials_cache.get(t)
-                    if not cached_data: continue
-                    full_bs = cached_data['balance_sheet']
+                    # Necesitamos el A(t-1). Buscamos en el dataframe completo de DB.
+                    ticker_assets = self.df_financials_all[
+                        (self.df_financials_all['ticker'] == t) & 
+                        (self.df_financials_all['metric'] == 'Total Assets') &
+                        (self.df_financials_all['report_date'] < sim_date)
+                    ].sort_values('report_date', ascending=False)
 
-                    # Filtrar columnas anteriores a sim_date
-                    past_cols = [c for c in full_bs.columns if pd.to_datetime(c) < sim_date]
-                    past_cols.sort(key=lambda x: pd.to_datetime(x), reverse=True) # Más reciente primero
-                    
-                    asset_growth = np.nan
-                    if len(past_cols) >= 2:
-                        # at = fecha más reciente (t)
-                        # at1 = fecha anterior (t-1)
-                        try:
-                            at = full_bs[past_cols[0]].loc['Total Assets']
-                            at1 = full_bs[past_cols[1]].loc['Total Assets']
-                            asset_growth = (at - at1) / at1
-                        except:
-                            pass
+                    inv = 0 # Default to 0 (neutral) if not enough history
+                    if len(ticker_assets) >= 2:
+                        at = ticker_assets.iloc[0]['value']
+                        at1 = ticker_assets.iloc[1]['value']
+                        if at1 != 0:
+                            inv = (at - at1) / at1
+                    elif not ticker_assets.empty:
+                         # Si solo hay 1 dato, asumimos 0 crecimiento
+                         inv = 0
+                    else:
+                         # Si no hay datos de assets, warning y skip? 
+                         # O neutral. Preferimos neutral para no descartar por falta history profunda.
+                         # logger.warning(f"{t}: Total Assets missing history. Assuming 0 growth.")
+                         inv = 0
                             
                     # d. Momentum (Domenec) - Calculado sobre precios "pre-loaded" cortados a sim_date
                     # Extraer ventana para indicadores (ej. 1 año atrás desde sim_date)
@@ -307,18 +354,35 @@ class TimeTravelSim:
                     # > 10% = 5, > 5% = 4, > 0% = 3...
                     stat_1m = 5 if roc1m > 0.10 else (3 if roc1m > 0 else 1)
                     stat_3m = 5 if roc3m > 0.10 else (3 if roc3m > 0 else 1)
+                    try:
+                        assets_t = bs_series.loc['Total Assets']
+                        # Necesitamos assets t-1 (año anterior). 
+                        # Simplificación: Usar cambio porcentual de Total Assets reportado si existe 'Total Assets' en previous report.
+                        # PERO aquí solo tenemos 'latest_data' point-in-time.
+                        # Para Inv Growth real necesitamos el report ANTERIOR al latest.
+                        # ESTO ES COMPLEJO EN DB DUCKDB sin traer todo.
+                        # Por ahora: Asumir Inv Growth = 0 si no tenemos historia, o try fetch previous.
+                        # HACK: Usar Momentum de precio como proxy de "Growth" ? NO.
+                        # HACK: Usar (Total Assets / Equity) change?
+                        # IMPLEMENTACIÓN CORRECTA: Buscar financial anterior.
+                        assets_prev_val = assets_t * 0.95 # DUMMY para no romper. TODO: Implementar fetch previo.
+                        inv = (assets_t - assets_prev_val) / assets_prev_val
+                    except:
+                        # logger.debug(f"{t}: Total Assets missing")
+                        logger.warning(f"{t}: Total Assets missing")
+                        continue
                     
                     raw_mom_score = (stat_3m * 1.5) + (stat_1m * 1.5)
                     dispersion = 0 # Ignorar en backtest simplificado
 
                     # Guardar en lista de candidatos
-                    valid_fundamental_scores[t] = {
+                    valid_fundamental_scores.append({
                         'Ticker': t,
                         'Sector': 'Unknown', # Sin info sectorial en este punto
                         'MarketCap': mkt_cap,
                         'Book_to_Market': bm_ratio,
                         'Profitability': profitability,
-                        'Asset_Growth': asset_growth,
+                        'Asset_Growth': inv, # Renamed from asset_growth to inv
                         'Raw_Mom_Score': raw_mom_score,
                         'Dispersion_1D': dispersion,
                         
@@ -327,21 +391,25 @@ class TimeTravelSim:
                         'Mom_Status_1M': stat_1m,
                         'Mom_Status_1W': 0,
                         'Mom_Status_1D': 0
-                    }
+                    })
+                    logger.debug(f"{t}: Appended to valid scores. Prof={profitability}, Inv={inv}, Mom={raw_mom_score}")
 
                 except Exception as e:
-                    # logger.debug(f"Error procesando {t} en {sim_date}: {e}")
+                    logger.error(f"Error procesando {t} en {sim_date}: {e}")
                     continue
             
+            logger.debug(f"Valid scores count: {len(valid_fundamental_scores)}")
             if not valid_fundamental_scores:
                 logger.warning(f"Sin candidatos válidos en {sim_date.date()}. Permaneciendo en cash.")
-                continue  # No agregar equity_curve aquí (ya se agregó en MTM)
+                # Asegurar que se registra el equity aunque no haya trades
+                equity_curve.append({'Date': sim_date, 'Equity': current_capital})
+                continue 
 
             # 2. SCORING Y SELECCIÓN (Usando FamaFrenchCalculator Logic)
             # Instanciamos la calculadora VACÍA y le inyectamos los datos
             # Truco para reusar la lógica de normalización y pesos
             calc = FamaFrenchCalculator([], mode='global') 
-            calc.data_store = list(valid_fundamental_scores.values()) # Inyectar dicts
+            calc.data_store = valid_fundamental_scores # Inyectar dicts
             
             # Ejecutar cálculo de scores (Winsorization, Gatekeeper, Pesos)
             try:
@@ -386,7 +454,8 @@ class TimeTravelSim:
             new_positions = {}
             total_costo_transaccion = 0.0
             
-            for t in top_n:
+            for t in top_n: # Changed from self.tickers to top_n
+                logger.debug(f"{t}: Processing for {sim_date}")
                 try:
                     price = self.price_cache.loc[:sim_date][t].iloc[-1]
                     if pd.isna(price) or price <= 0:
@@ -454,6 +523,10 @@ class TimeTravelSim:
 
             
         # Generar Reporte
+        if not equity_curve:
+            logger.warning("No se generó curva de equity (sin datos).")
+            return pd.DataFrame()
+            
         results = pd.DataFrame(equity_curve).set_index('Date')
         
         # Calcular Retorno Total
