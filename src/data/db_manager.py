@@ -79,7 +79,6 @@ class DBManager:
         """)
         
         # Tabla de Fundamentales (Balance Sheet, Financials)
-        # Almacenamos en formato largo para flexibilidad
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS financials (
                 ticker VARCHAR,
@@ -92,222 +91,212 @@ class DBManager:
         """)
 
         # Tabla de Metadatos de Tickers (Sector, Shares, Currency)
+        # Agregamos columnas de TTL diferenciado si no existen
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS tickers_metadata (
                 ticker VARCHAR PRIMARY KEY,
                 sector VARCHAR,
                 shares DOUBLE,
                 currency VARCHAR,
-                last_updated TIMESTAMP
+                last_updated TIMESTAMP,
+                last_updated_prices TIMESTAMP,
+                last_updated_financials TIMESTAMP
             )
         """)
+        
+        # Migración: Verificar si las nuevas columnas existen (para DBs ya creadas)
+        cols = self.conn.execute("PRAGMA table_info('tickers_metadata')").df()
+        if 'last_updated_prices' not in cols['name'].values:
+            logger.info("Migrando tickers_metadata: Agregando columna last_updated_prices")
+            self.conn.execute("ALTER TABLE tickers_metadata ADD COLUMN last_updated_prices TIMESTAMP")
+        if 'last_updated_financials' not in cols['name'].values:
+            logger.info("Migrando tickers_metadata: Agregando columna last_updated_financials")
+            self.conn.execute("ALTER TABLE tickers_metadata ADD COLUMN last_updated_financials TIMESTAMP")
 
-    def _get_outdated_tickers(self, tickers):
-        """Identifica qué tickers necesitan actualización (faltantes o >24h)."""
+    def _get_outdated_tickers(self, tickers, category='prices'):
+        """
+        Identifica qué tickers necesitan actualización según categoría.
+        category: 'prices' (7 días) o 'financials' (30 días).
+        """
         if not tickers: return []
         
-        # 1. Obtener tickers que ya existen y su timestamp
-        tickers_str = "'" + "','".join(tickers) + "'"
+        col = 'last_updated_prices' if category == 'prices' else 'last_updated_financials'
+        # Fallback a last_updated si la columna nueva está vacía (migración)
+        query = f"""
+            SELECT ticker, 
+                   COALESCE({col}, last_updated) as last_upd 
+            FROM tickers_metadata 
+            WHERE ticker IN ({"'" + "','".join(tickers) + "'"})
+        """
         try:
-            query = f"SELECT ticker, last_updated FROM tickers_metadata WHERE ticker IN ({tickers_str})"
             existing = self.conn.execute(query).df()
         except:
-            return tickers # Si falla la query, asumir todos outdated
+            return tickers
         
-        existing_dict = existing.set_index('ticker')['last_updated'].to_dict()
-        
+        existing_dict = existing.set_index('ticker')['last_upd'].to_dict()
         outdated = []
         now = datetime.now()
+        ttl = timedelta(days=7) if category == 'prices' else timedelta(days=30)
         
         for t in tickers:
-            if t not in existing_dict:
+            if t not in existing_dict or existing_dict[t] is None:
                 outdated.append(t)
             else:
                 last_upd = existing_dict[t]
-                # Verificar TTL 24h
-                if (now - last_upd) > timedelta(hours=24):
+                if (now - last_upd) > ttl:
                     outdated.append(t)
                     
         return outdated
 
-    def _delete_data_for_tickers(self, tickers):
-        """Borra datos de precios y fundamentales para una lista de tickers."""
+    def _delete_data_for_tickers(self, tickers, table='prices'):
+        """Borra datos para una lista de tickers en una tabla específica."""
         if not tickers: return
-        
-        logger.info(f"Limpiando datos previos para {len(tickers)} tickers...")
         tickers_str = "'" + "','".join(tickers) + "'"
-        
-        self.conn.execute(f"DELETE FROM prices WHERE ticker IN ({tickers_str})")
-        self.conn.execute(f"DELETE FROM financials WHERE ticker IN ({tickers_str})")
-        # No borramos metadata aun, se reemplazará al insertar
-        
+        self.conn.execute(f"DELETE FROM {table} WHERE ticker IN ({tickers_str})")
+    def _fetch_yfinance_fundamentals(self, ticker):
+        """Helper para descargar fundamentales desde YFinance (Fallback/Default)."""
+        data = []
+        try:
+            t = yf.Ticker(ticker)
+            # B. Balance Sheet
+            bs = t.balance_sheet
+            if not bs.empty:
+                for date_col in bs.columns:
+                    report_date = pd.to_datetime(date_col)
+                    for metric, value in bs[date_col].items():
+                        if pd.notna(value):
+                            data.append((ticker, report_date, metric, float(value), 'BS'))
+            
+            # C. Financials (Income Statement)
+            fin = t.financials
+            if not fin.empty:
+                for date_col in fin.columns:
+                    report_date = pd.to_datetime(date_col)
+                    for metric, value in fin[date_col].items():
+                        if pd.notna(value):
+                            data.append((ticker, report_date, metric, float(value), 'IS'))
+        except Exception as e:
+            logger.debug(f"Error procesando fundamentales YF para {ticker}: {e}")
+        return data
+
     def update_history(self, tickers: list, source: str = 'yfinance'):
-        """
-        Actualiza la base de datos solo para los tickers que lo necesiten.
-        Args:
-            tickers: Lista de tickers
-            source: 'yfinance' o 'sec'
-        """
-        # Deduplicar
+        """Actualiza la DB con optimización de vectorización y TTL diferenciado."""
         tickers = sorted(list(set(tickers)))
         
-        # 1. Verificar qué tickers necesitan update
-        tickers_to_update = self._get_outdated_tickers(tickers)
-        
-        if not tickers_to_update:
-            logger.info(f"Todos los {len(tickers)} tickers están actualizados (Cache < 24h).")
+        # 1. Tickers que necesitan precios (TTL 7d)
+        tickers_prices = self._get_outdated_tickers(tickers, 'prices')
+        # 2. Tickers que necesitan fundamentales (TTL 30d)
+        tickers_fin = self._get_outdated_tickers(tickers, 'financials')
+
+        if not tickers_prices and not tickers_fin:
+            logger.info("Datos locales actualizados (TTL Precios: 7d, Fundamentales: 30d).")
             return
 
-        logger.info(f"Actualizando {len(tickers_to_update)} tickers (Fuente: {source.upper()})...")
-        
-        # 2. Limpiar datos viejos de esos tickers
-        self._delete_data_for_tickers(tickers_to_update)
-        
         try:
-            # 3. Descargar Precios (Batch para los tickers a actualizar)
-            # Usamos tickers_to_update para la descarga
-            logger.info("Descargando precios (Batch)...")
-            # threads=False para evitar conflictos con curl_cffi/requests session en algunos entornos (ej. tests)
-            df_prices = yf.download(tickers_to_update, period="5y", group_by='ticker', auto_adjust=True, threads=False, progress=False)
-            
-            # Procesar y guardar precios
-            batch_data = []
-            
-            # Caso 1: Un solo ticker (yf devuelve DataFrame simple, no MultiIndex)
-            if len(tickers_to_update) == 1:
-                ticker = tickers_to_update[0]
-                df = df_prices
-                if not df.empty:
-                    df = df.reset_index()
-                    for _, row in df.iterrows():
-                        batch_data.append((
-                            ticker, row['Date'], 
-                            row['Open'], row['High'], row['Low'], row['Close'], row['Volume']
-                        ))
-            
-            # Caso 2: Múltiples tickers (MultiIndex)
-            else:
-                for ticker in tickers_to_update:
-                    if ticker not in df_prices.columns.get_level_values(0):
-                        continue
-                        
-                    df = df_prices[ticker].copy()
-                    df = df.dropna(how='all')
-                    df = df.reset_index()
+            # --- SECCIÓN A: ACTUALIZAR PRECIOS (Si es necesario) ---
+            if tickers_prices:
+                logger.info(f"Actualizando precios para {len(tickers_prices)} tickers...")
+                self._delete_data_for_tickers(tickers_prices, 'prices')
+                
+                batch_size = 50
+                for i in range(0, len(tickers_prices), batch_size):
+                    batch = tickers_prices[i:i + batch_size]
+                    logger.info(f"Descargando precios batch {i//batch_size + 1}/{(len(tickers_prices)-1)//batch_size + 1}...")
                     
-                    for _, row in df.iterrows():
-                        # Validar tipos básicos
-                        if pd.isna(row['Close']): continue
+                    try:
+                        df_batch = yf.download(batch, period="20y", group_by='ticker', 
+                                             auto_adjust=True, threads=False, progress=False)
                         
-                        batch_data.append((
-                            ticker, row['Date'], 
-                            row['Open'], row['High'], row['Low'], row['Close'], row['Volume']
-                        ))
-            
-            # Insertar Precios en Batch
-            if batch_data:
-                self.conn.executemany(
-                    "INSERT OR IGNORE INTO prices VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    batch_data
-                )
-                logger.info(f"Insertados {len(batch_data)} registros de precios.")
+                        if df_batch.empty: continue
 
-            # 4. Descarga de Fundamentales y Metadatos
-            logger.info(f"Descargando fundamentales (Fuente: {source.upper()})...")
-            financials_data = []
-            metadata_records = []
-            
-            # Usamos tickers_to_update para iterar
-            if source == 'sec':
-                # --- LOGICA SEC ---
-                try:
+                        # Vectorización: Transformar MultiIndex a Long format directamente
+                        if isinstance(df_batch.columns, pd.MultiIndex):
+                            # Stack nivel 0 (tickers)
+                            df_long = df_batch.stack(level=0, future_stack=True).reset_index()
+                            df_long.rename(columns={
+                                'level_1': 'ticker', 'Date': 'date', 'Open': 'open',
+                                'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'
+                            }, inplace=True)
+                        else:
+                            # Un solo ticker
+                            df_long = df_batch.reset_index()
+                            df_long['ticker'] = batch[0]
+                            df_long.rename(columns={
+                                'Date': 'date', 'Open': 'open', 'High': 'high',
+                                'Low': 'low', 'Close': 'close', 'Volume': 'volume'
+                            }, inplace=True)
+
+                        # Limpieza y casting
+                        df_long = df_long.dropna(subset=['close'])
+                        
+                        # Inserción Directa a DuckDB desde Pandas (Ultra Rápido)
+                        if not df_long.empty:
+                            self.conn.execute("INSERT OR IGNORE INTO prices SELECT * FROM df_long")
+                            # Actualizar timestamp de precios
+                            now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            self.conn.execute(f"""
+                                UPDATE tickers_metadata SET last_updated_prices = '{now_str}' 
+                                WHERE ticker IN ({"'" + "','".join(batch) + "'"})
+                            """)
+                    except Exception as e:
+                        logger.error(f"Error en batch de precios: {e}")
+
+            # --- SECCIÓN B: ACTUALIZAR FUNDAMENTALES (Si es necesario) ---
+            if tickers_fin:
+                logger.info(f"Actualizando fundamentales para {len(tickers_fin)} tickers...")
+                self._delete_data_for_tickers(tickers_fin, 'financials')
+                
+                financials_data = []
+                metadata_records = []
+                
+                if source == 'sec':
                     downloader = SECDownloader(user_agent=SEC_USER_AGENT)
-                    total = len(tickers_to_update)
-                    for i, ticker in enumerate(tickers_to_update):
-                        if i % 5 == 0: print(f"SEC Download {i}/{total} ({ticker})...", end='\r')
+                    for i, ticker in enumerate(tickers_fin):
+                        if i % 10 == 0: print(f"SEC Download {i}/{len(tickers_fin)} ({ticker})...", end='\r')
                         
-                        # A. Metadatos básicos (desde yfinance para complementar)
+                        # Metadatos (Siempre actualizar si estamos aquí)
                         try:
-                            t_yf = yf.Ticker(ticker)
-                            info = t_yf.info
-                            sector = info.get('sector', 'Unknown')
-                            shares = info.get('sharesOutstanding', 0)
-                            currency = info.get('currency', 'USD')
+                            info = yf.Ticker(ticker).info
+                            metadata_records.append((
+                                ticker, info.get('sector', 'Unknown'), 
+                                info.get('sharesOutstanding', 0), info.get('currency', 'USD'),
+                                datetime.now(), None, datetime.now() # last_updated, prices, financials
+                            ))
                         except:
-                            sector, shares, currency = 'Unknown', 0, 'USD'
-                        
-                        metadata_records.append((ticker, sector, shares, currency, datetime.now()))
+                            metadata_records.append((ticker, 'Unknown', 0, 'USD', datetime.now(), None, datetime.now()))
 
-                        # B. Fundamentales (SEC)
+                        # Fundamentales
                         facts = downloader.get_company_facts(ticker)
                         if facts:
                             parsed = downloader.parse_facts(facts, ticker)
-                            financials_data.extend(parsed)
+                            if parsed: financials_data.extend(parsed)
                         else:
-                            logger.warning(f"No facts for {ticker} from SEC")
-
-                except Exception as e_sec:
-                    logger.error(f"Error en bloque SEC: {e_sec}")
-
-            else:
-                # --- LOGICA YFINANCE (Legado) ---
-                total = len(tickers_to_update)
-                for i, ticker in enumerate(tickers_to_update):
-                    if i % 10 == 0: print(f"YF Download {i}/{total} ({ticker})...", end='\r')
-                    try:
-                        t = yf.Ticker(ticker)
-                        
-                        # A. Metadatos (Info)
+                            yf_fund = self._fetch_yfinance_fundamentals(ticker)
+                            if yf_fund: financials_data.extend(yf_fund)
+                else:
+                    for i, ticker in enumerate(tickers_fin):
+                        if i % 10 == 0: print(f"YF Download {i}/{len(tickers_fin)} ({ticker})...", end='\r')
                         try:
+                            t = yf.Ticker(ticker)
                             info = t.info
-                            sector = info.get('sector', 'Unknown')
-                            shares = info.get('sharesOutstanding', 0)
-                            currency = info.get('currency', 'USD')
-                            metadata_records.append((ticker, sector, shares, currency, datetime.now()))
-                        except Exception as e_meta:
-                            logger.warning(f"{ticker}: Error en metadatos: {e_meta}")
-                            metadata_records.append((ticker, 'Unknown', 0, 'USD', datetime.now()))
+                            metadata_records.append((
+                                ticker, info.get('sector', 'Unknown'), 
+                                info.get('sharesOutstanding', 0), info.get('currency', 'USD'),
+                                datetime.now(), None, datetime.now()
+                            ))
+                            yf_fund = self._fetch_yfinance_fundamentals(ticker)
+                            if yf_fund: financials_data.extend(yf_fund)
+                        except:
+                            metadata_records.append((ticker, 'Unknown', 0, 'USD', datetime.now(), None, datetime.now()))
 
-                        # B. Balance Sheet
-                        bs = t.balance_sheet
-                        if not bs.empty:
-                            for date_col in bs.columns:
-                                report_date = pd.to_datetime(date_col)
-                                for metric, value in bs[date_col].items():
-                                    if pd.notna(value):
-                                        financials_data.append((ticker, report_date, metric, float(value), 'BS'))
-                        
-                        # C. Financials (Income Statement)
-                        fin = t.financials
-                        if not fin.empty:
-                            for date_col in fin.columns:
-                                report_date = pd.to_datetime(date_col)
-                                for metric, value in fin[date_col].items():
-                                    if pd.notna(value):
-                                        financials_data.append((ticker, report_date, metric, float(value), 'IS'))
-                                        
-                    except Exception as e:
-                        logger.debug(f"Error procesando {ticker}: {e}")
-                        continue
-            
-            # Insertar Metadatos (con timestamp actual)
-            if metadata_records:
-                self.conn.executemany(
-                    "INSERT OR REPLACE INTO tickers_metadata VALUES (?, ?, ?, ?, ?)",
-                    metadata_records
-                )
-                logger.info(f"Actualizados metadatos para {len(metadata_records)} tickers.")
-
-            # Insertar Fundamentales
-            if financials_data:
-                self.conn.executemany(
-                    "INSERT OR IGNORE INTO financials VALUES (?, ?, ?, ?, ?)",
-                    financials_data
-                )
-                logger.info(f"Insertados {len(financials_data)} registros fundamentales.")
-
-            logger.info("Actualización parcial completada con éxito.")
-            
+                # Inserciones en Batch
+                if metadata_records:
+                    self.conn.executemany("INSERT OR REPLACE INTO tickers_metadata VALUES (?, ?, ?, ?, ?, ?, ?)", metadata_records)
+                if financials_data:
+                    self.conn.executemany("INSERT OR IGNORE INTO financials VALUES (?, ?, ?, ?, ?)", financials_data)
+                
+                logger.info("Actualización de fundamentales completada.")
+                
         except Exception as e:
             logger.error(f"Error crítico actualizando DB: {e}")
             raise
@@ -332,3 +321,16 @@ class DBManager:
 
     def close(self):
         self.conn.close()
+
+    def clear_table(self, table):
+        """Vacía una tabla específica."""
+        if table in ['prices', 'financials']:
+            self.conn.execute(f"DELETE FROM {table}")
+            col = 'last_updated_prices' if table == 'prices' else 'last_updated_financials'
+            self.conn.execute(f"UPDATE tickers_metadata SET {col} = NULL")
+            logger.info(f"Tabla {table} vaciada y timestamps reseteados.")
+        elif table == 'all':
+            self.conn.execute("DELETE FROM prices")
+            self.conn.execute("DELETE FROM financials")
+            self.conn.execute("DELETE FROM tickers_metadata")
+            logger.info("Base de datos vaciada por completo.")
