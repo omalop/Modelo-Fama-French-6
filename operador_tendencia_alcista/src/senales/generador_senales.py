@@ -47,8 +47,9 @@ class GeneradorSenales:
 
         # Asegurar indicadores en Diario
         if 'Genial_Line' not in df_diario.columns:
-            IndicadoresDomenec.aplicar(df_diario)
-            ClasificadorVelas.clasificar(df_diario)
+            # Los indicadores ahora devuelven una copia explicita, debemos asignarla
+            df_diario = IndicadoresDomenec.aplicar(df_diario)
+            df_diario = ClasificadorVelas.clasificar(df_diario)
 
         # Analizar última vela cerrada (y previa para contexto)
         vela_actual = df_diario.iloc[-1]

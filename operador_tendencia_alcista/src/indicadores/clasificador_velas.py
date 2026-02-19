@@ -36,13 +36,16 @@ class ClasificadorVelas:
         if df.empty: return df
 
         try:
+            # Crear copia para evitar SettingWithCopyWarning
+            df = df.copy()
+            
             # Calcular indicadores base
-            df['WPR'] = calculate_wpr(df['High'], df['Low'], df['Close'], p_dir)
-            df['ADX'] = calculate_adx(df['High'], df['Low'], df['Close'], p_force)
+            df.loc[:, 'WPR'] = calculate_wpr(df['High'], df['Low'], df['Close'], p_dir)
+            df.loc[:, 'ADX'] = calculate_adx(df['High'], df['Low'], df['Close'], p_force)
 
             # Valores previos (Shiftear 1 para comparar con vela anterior)
-            df['WPR_Prev'] = df['WPR'].shift(1)
-            df['ADX_Prev'] = df['ADX'].shift(1)
+            df.loc[:, 'WPR_Prev'] = df['WPR'].shift(1)
+            df.loc[:, 'ADX_Prev'] = df['ADX'].shift(1)
 
             # Condición tendencias locales (Logic from script)
             # df['WPR_Up'] = df['WPR'] > df['WPR_Prev']
@@ -88,10 +91,10 @@ class ClasificadorVelas:
 
             # Asignar 'Score_Control' numérico
             # Default es 0 (Bajista) si no cumple condiciones de WPR > -50
-            df['Score_Control'] = np.select(conditions, choices_score, default=ClasificadorVelas.ESTADO_BAJISTA)
+            df.loc[:, 'Score_Control'] = np.select(conditions, choices_score, default=ClasificadorVelas.ESTADO_BAJISTA)
             
             # Asignar 'Status_Control' label
-            df['Status_Control'] = np.select(conditions, choices_label, default='Zona Bajista / Neutral')
+            df.loc[:, 'Status_Control'] = np.select(conditions, choices_label, default='Zona Bajista / Neutral')
 
             return df
 

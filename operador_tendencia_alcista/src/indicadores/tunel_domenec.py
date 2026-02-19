@@ -29,25 +29,28 @@ class IndicadoresDomenec:
             return df
 
         try:
+            # Trabajar sobre copia para evitar SettingWithCopyWarning
+            df = df.copy()
+
             # 1. GENIAL LINE (SMA 34)
-            df['Genial_Line'] = df['Close'].rolling(window=34).mean()
+            df.loc[:, 'Genial_Line'] = df['Close'].rolling(window=34).mean()
 
             # 2. ZONA DE CORRECCION (EMA 8 vs Wilder 8)
-            df['EMA_8'] = df['Close'].ewm(span=8, adjust=False).mean()
-            df['Wilder_8'] = calculate_rma(df['Close'], 8)
+            df.loc[:, 'EMA_8'] = df['Close'].ewm(span=8, adjust=False).mean()
+            df.loc[:, 'Wilder_8'] = calculate_rma(df['Close'], 8)
             
             # Condición: True si EMA8 > Wilder8 (Zona Alcista/Verde), False si Roja
-            df['Zona_Correccion_Alcista'] = df['EMA_8'] > df['Wilder_8']
+            df.loc[:, 'Zona_Correccion_Alcista'] = df['EMA_8'] > df['Wilder_8']
 
             # 3. TUNEL DOMENEC (EMAs Fibonacci)
             emas = [123, 188, 416, 618, 882, 1223]
             for p in emas:
                 var_name = f'EMA_{p}'
-                df[var_name] = df['Close'].ewm(span=p, adjust=False).mean()
+                df.loc[:, var_name] = df['Close'].ewm(span=p, adjust=False).mean()
 
             # 4. DISPERSIÓN (Diferencia % con SMA 34)
             # Útil para detectar agotamiento o necesidad de corrección a la media
-            df['Dispersion_SMA34'] = ((df['Close'] - df['Genial_Line']) / df['Genial_Line']) * 100
+            df.loc[:, 'Dispersion_SMA34'] = ((df['Close'] - df['Genial_Line']) / df['Genial_Line']) * 100
 
             logger.debug("Indicadores Domènec calculados exitosamente.")
             return df

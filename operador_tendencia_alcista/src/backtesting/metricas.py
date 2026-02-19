@@ -60,23 +60,31 @@ class Metricas:
         """
         Win Rate, Profit Factor, Promedio Ganancia/Pérdida.
         """
+        # Esquema base por defecto
+        resultado = {
+            'total_trades': 0,
+            'win_rate': 0.0,
+            'profit_factor': 0.0,
+            'avg_profit': 0.0,
+            'avg_loss': 0.0,
+            'total_pnl': 0.0
+        }
+        
         if trades.empty:
-            return {'win_rate': 0, 'profit_factor': 0}
+            return resultado
         
         ganadoras = trades[trades['pnl'] > 0]
         perdedoras = trades[trades['pnl'] <= 0]
         
-        win_rate = len(ganadoras) / len(trades)
+        resultado['total_trades'] = len(trades)
+        resultado['win_rate'] = len(ganadoras) / len(trades)
         
         gross_profit = ganadoras['pnl'].sum()
         gross_loss = abs(perdedoras['pnl'].sum())
         
-        profit_factor = gross_profit / gross_loss if gross_loss != 0 else float('inf')
+        resultado['profit_factor'] = gross_profit / gross_loss if gross_loss != 0 else float('inf')
+        resultado['avg_profit'] = ganadoras['pnl'].mean() if not ganadoras.empty else 0.0
+        resultado['avg_loss'] = perdedoras['pnl'].mean() if not perdedoras.empty else 0.0
+        resultado['total_pnl'] = trades['pnl'].sum()
         
-        return {
-            'total_trades': len(trades),
-            'win_rate': win_rate,
-            'profit_factor': profit_factor,
-            'avg_profit': ganadoras['pnl'].mean() if not ganadoras.empty else 0,
-            'avg_loss': perdedoras['pnl'].mean() if not perdedoras.empty else 0
-        }
+        return resultado
