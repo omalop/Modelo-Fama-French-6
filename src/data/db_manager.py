@@ -213,8 +213,10 @@ class DBManager:
                         if isinstance(df_batch.columns, pd.MultiIndex):
                             # Stack nivel 0 (tickers)
                             df_long = df_batch.stack(level=0, future_stack=True).reset_index()
+                            
+                            # yfinance y pandas devolvieron la columna como 'Ticker' o 'level_1', contemplamos ambas
                             df_long.rename(columns={
-                                'level_1': 'ticker', 'Date': 'date', 'Open': 'open',
+                                'level_1': 'ticker', 'Ticker': 'ticker', 'Date': 'date', 'Open': 'open',
                                 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'
                             }, inplace=True)
                         else:
@@ -229,6 +231,11 @@ class DBManager:
                         # Limpieza y casting
                         df_long = df_long.dropna(subset=['close'])
                         
+                        # ALINEAR el orden exacto de las columnas de DuckDB (ticker, date, open, high, low, close, volume)
+                        # También descartamos cualquier otra columna adicional (ej: Adj Close, Dividends, etc)
+                        column_order = ['ticker', 'date', 'open', 'high', 'low', 'close', 'volume']
+                        df_long = df_long[[c for c in column_order if c in df_long.columns]]
+
                         # Inserción Directa a DuckDB desde Pandas (Ultra Rápido)
                         if not df_long.empty:
                             self.conn.execute("INSERT OR IGNORE INTO prices SELECT * FROM df_long")

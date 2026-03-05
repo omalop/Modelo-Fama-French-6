@@ -1,0 +1,175 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║  SISTEMA PROFESIONAL DE INDICADORES ADELANTADOS DE CRISIS FINANCIERA v7.0   ║
+║                                                                              ║
+║  "De código amateur a herramienta de decisión validada"                     ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📦 CONTENIDO DEL PAQUETE:
+═══════════════════════════
+
+1. crisis_dashboard_pro.py       → Script principal (ejecutable)
+2. recalc.py                      → Utilidad para Excel (opcional)
+3. GUIA_USUARIO.md               → Guía para no-técnicos ⭐ LEE ESTO PRIMERO
+4. EJEMPLO_INTERPRETACION.md     → Caso práctico de uso
+5. README_TECNICO.md             → Documentación técnica completa
+6. LEEME_PRIMERO.txt             → Este archivo
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🚀 INICIO RÁPIDO (5 MINUTOS):
+═══════════════════════════
+
+1. Instalar Python 3.8+ (si no lo tienes)
+   → https://www.python.org/downloads/
+
+2. Instalar librerías:
+   pip install pandas numpy yfinance fredapi requests beautifulsoup4 openpyxl python-dotenv
+
+3. Obtener API Key GRATIS de FRED:
+   → https://fred.stlouisfed.org/docs/api/api_key.html
+
+4. Crear archivo .env con:
+   FRED_API_KEY=tu_clave_aqui
+
+5. Ejecutar:
+   python crisis_dashboard_pro.py
+
+6. Esperar 2-3 minutos (primera vez con backtesting)
+
+7. ¡LISTO! Verás resultados en pantalla + Excel generado
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📚 ¿QUÉ LEER SEGÚN TU PERFIL?
+═════════════════════════════
+
+👤 INVERSOR PARTICULAR (sin conocimientos técnicos):
+   → Lee: GUIA_USUARIO.md
+   → Luego: EJEMPLO_INTERPRETACION.md
+
+💼 INVERSOR AVANZADO (con experiencia):
+   → Lee: EJEMPLO_INTERPRETACION.md
+   → Ejecuta: crisis_dashboard_pro.py
+   → Opcional: README_TECNICO.md
+
+👨‍💻 DESARROLLADOR (quieres modificar el código):
+   → Lee: README_TECNICO.md
+   → Revisa: crisis_dashboard_pro.py (código comentado)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ LO QUE ESTE SISTEMA TE DA:
+══════════════════════════════
+
+✓ 5 indicadores validados históricamente (backtesting 1990-2024)
+✓ Precisión documentada de cada señal (45%-71% según indicador)
+✓ Recomendaciones accionables (% de acciones, coberturas, etc.)
+✓ Integración del Fear & Greed Index (contrarian signal)
+✓ Score compuesto ponderado por confiabilidad
+✓ Reporte Excel profesional automático
+✓ Sistema de caché para velocidad
+✓ Retry automático ante errores de API
+✓ Documentación completa para todos los niveles
+
+═══════════════════════════════════════════════════════════════════════════════
+
+⚠️  LO QUE ESTE SISTEMA NO ES:
+═══════════════════════════════
+
+✗ NO es una bola de cristal
+✗ NO anticipa cisnes negros (COVID, 9/11, etc.)
+✗ NO reemplaza tu análisis técnico (Elliott Wave, etc.)
+✗ NO es asesoramiento financiero (eres 100% responsable)
+✗ NO tiene precisión del 100% (ver backtesting)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 CUÁNDO USAR ESTE SISTEMA:
+═════════════════════════════
+
+✅ ÚSALO para:
+   • Complementar tu análisis técnico (Elliott Wave)
+   • Decidir % de exposición a acciones
+   • Timing de entrada/salida de mercado
+   • Validar tu "gut feeling" con datos
+   • Saber cuándo estar defensivo vs. ofensivo
+
+❌ NO lo uses para:
+   • Selección de acciones individuales
+   • Trading intradía (es para macro)
+   • Decisiones de vida o muerte
+   • Inversión de dinero que no puedes perder
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 RESULTADOS DEL BACKTESTING:
+═══════════════════════════════
+
+Crisis anticipadas correctamente: 7 de 10 (70%)
+
+Indicador más confiable: Curva Invertida (71% precisión)
+Indicador más rápido: VIX (anticipa 30 días)
+Mejor para largo plazo: Curva de Tipos (anticipa 12-24 meses)
+
+Falsas alarmas promedio: 30-55% (según indicador)
+Por eso usamos SCORE COMPUESTO, no indicadores individuales.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🆘 PROBLEMAS COMUNES:
+══════════════════════
+
+P: Error "No se encontró FRED_API_KEY"
+R: Crea archivo .env con tu clave
+
+P: Error "Rate Limit" de Yahoo
+R: El sistema reinicia automáticamente, espera 30s
+
+P: VIX no descarga
+R: El sistema usa FRED automáticamente como backup
+
+P: Excel no se genera
+R: Instala: pip install openpyxl
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📞 SIGUIENTE PASO:
+═══════════════════
+
+→ Abre GUIA_USUARIO.md para entender cada indicador
+→ Luego ejecuta: python crisis_dashboard_pro.py
+→ Interpreta resultados con EJEMPLO_INTERPRETACION.md
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 RECORDATORIO IMPORTANTE:
+
+"El objetivo NO es predecir crisis con 100% de precisión.
+El objetivo es INCLINAR LAS PROBABILIDADES A TU FAVOR."
+
+Con este sistema:
+- En vez de 50/50, tienes 60/40 o 70/30
+- Reduces drawdowns en crisis
+- Evitas FOMO en topos de mercado
+- Compras barato cuando todos venden
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎓 FILOSOFÍA DE INVERSIÓN:
+
+"Be fearful when others are greedy,
+ and greedy when others are fearful"
+                    - Warren Buffett
+
+Este sistema te dice CUÁNDO el mercado está siendo codicioso o temeroso.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Versión: 7.0 Professional
+Fecha: Diciembre 2024
+
+¡Buenas inversiones y que este sistema te proteja en las crisis! 📈🛡️
+
+═══════════════════════════════════════════════════════════════════════════════

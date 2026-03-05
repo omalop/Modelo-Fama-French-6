@@ -1,0 +1,427 @@
+﻿ <div id="result-portafolioOnline" style="display: block;">        <div style="display:none" id="encabezadoExcel">            <p id="print-titulo-consulta" style="text-align: center;">                <b style="font-size:16" ;="">Portafolio Online</b>            </p>            <table>                <tbody><tr>                    <th>Usuario</th>                    <th class="text-left">Comitente</th>                    <th class="text-center">Fecha Desde</th>                    <th class="text-center">Fecha Hasta</th>                    <th class="text-left">Tipo</th>                    <th class="text-left">Especie</th>                    <th class="text-left">Filtro</th>                </tr>                <tr>                    <td> LOPEZ, OMAR ANGEL</td>                    <td>361170</td>                    <td></td>                    <td></td>                    <td></td>                    <td></td>                    <td></td>                </tr>            </tbody></table>        </div>
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <div class="box">
+            <div class="box-header box-header-custom">
+                <h3 class="box-title text-left text-bold" href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="right" title="Portafolio valorizado online"><i class="fa fa-bar-chart"></i> Portafolio valorizado online</h3>
+                <td></td>
+            </div>
+            <div class="box-body table-responsive no-padding">
+                <table class="table table-hover table-condensed text-bold table-consultas table-posicion-total">
+                    <tbody>
+                        <tr class="first-row" onclick="getGraficoPortafolioOnline()">
+                            <td><td></td></td>
+                            <td class="text-left"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="right" title="Total Portafolio">Total Portafolio</span></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-right"><p class="text-right text-bold">$ 7.904.226,85</p></td>
+                        </tr>
+                        <tr>
+                            <td><td></td></td>
+                            <td class="text-left"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="right" title="Portafolio Disponible">Portafolio Disponible</span></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-right"><p class="text-right text-bold"> $ 7.328.737,68</p></td>
+                        </tr>
+
+                        <tr>
+                            <td><td></td></td>
+                            <td class="text-left"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="right" title="Portafolio Opciones">Portafolio Opciones</span></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-right"><p class="text-right text-bold"> $ 14.100,00</p></td>
+                        </tr>
+
+                        <tr>
+                            <td><td></td></td>
+                            <td class="text-left"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="right" title="Portafolio en Garantía">Portafolio en Garantía</span></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-right"><p class="text-right text-bold"> $ 152.353,07</p></td>
+                        </tr>
+
+                        <tr>
+                            <td><td></td></td>
+                            <td class="text-left"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="right" title="Cuenta Corriente $">Cuenta Corriente $</span></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-right"><p class="text-right text-bold"> $ 409.036,10</p></td>
+                        </tr>
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12">
+        <div class="box">
+            <div class="box-header box-header-custom">
+                <h3 class="box-title text-left text-bold" href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Muestra el resultado de su consulta" data-placement="right" title="Detalle"><i class="glyphicon glyphicon-th"></i> Detalle</h3>
+            </div>
+            <div class="box-body table-responsive no-padding">
+                <table class="table table-striped table-condensed table-consultas">
+                    <thead class="th-principal-color">
+                        <tr>
+                            <th></th>
+                            <th class="text-left"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="Nombre de la Especie">Nombre de la Especie</span></th>
+                            <th class="text-left"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="Estado">Estado</span></th>
+                            <th class="text-right"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="Cantidad">Cantidad</span></th>
+                            <th class="text-right"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="Precio">Precio</span></th>
+                            <th class="text-right"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="Importe">Importe</span></th>
+                            <th class="text-right"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="% S/Total">% S/Total</span></th>
+                            <th class="text-right"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="Costo">Costo</span></th>
+                            <th class="text-right"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="% Var">% Var</span></th>
+                            <th class="text-right"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="Resultado">Resultado</span></th>
+                            <th class="text-right" id="tenValHora"><span href="#" onmouseover="openPopover();" data-toggle="popover" data-container="body" data-trigger="hover" data-content="Some content" data-placement="top" title="Hora">Hora</span></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td></td>
+
+                            <td class="text-left">Pesos </td>
+                            <td class="text-left">Total</td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-left"></td>
+                            <td class="text-left"><p class="text-right text-bold">409.036,10</p></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td class="text-left"> </td>
+                            <td class="text-left">Disponible</td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"></td>
+                            <td class="text-right"><p class="text-right text-bold">522.083,27</p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"><p class="text-right"></p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td class="text-left"> </td>
+                            <td class="text-left">A Liq</td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-136.057,17</p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"><p class="text-right"></p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td class="text-left"> </td>
+                            <td class="text-left">Garantia</td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"></td>
+                            <td class="text-right"><p class="text-right text-bold">23.010,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"><p class="text-right"></p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td class="text-right"><p class="text-right text-bold"></p></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr style="display:none;"></tr>
+                        <tr class="apli-online-Pesos" style="display: none;">
+                            <td colspan="12" style="border-top:none;">
+                                <div style="height:auto; /*text-align: -webkit-center;*/ float:right">
+                                    <table class="table table-striped table-condensed table-consultas no-margin" style="/*max-width=300px;*/">
+                                        <thead class="th-principal-color">
+                                            <tr>
+                                                <th class="text-left">Vencimiento</th>
+                                                <th class="text-right">Saldo</th>
+                                                <th class="text-right">Garantia</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Vencido</td>
+                                                <td><p class="text-right">522.083,27</p></td>
+                                                <td><p class="text-right"></p></td>
+                                            </tr>
+                                            <tr>
+                                                <td>24 Hs. 05/03/26</td>
+                                                <td><p class="text-right"></p></td>
+                                                <td><p class="text-right"></p></td>
+                                            </tr>
+                                            <tr>
+                                                <td>48 Hs. 06/03/26</td>
+                                                <td><p class="text-right numero-negativo">-136.057,17</p></td>
+                                                <td><p class="text-right"></p></td>
+                                            </tr>
+                                            <tr>
+                                                <td>72 Hs. 09/03/26</td>
+                                                <td><p class="text-right"></p></td>
+                                                <td><p class="text-right"></p></td>
+                                            </tr>
+                                            <tr>
+                                                <td>+ de 72 Hs.</td>
+                                                <td><p class="text-right"></p></td>
+                                                <td><p class="text-right"></p></td>
+                                            </tr>
+                                            <tr>
+                                                <td>Gtia.Opciones</td>
+                                                <td><p class="text-right">23.010,00</p></td>
+                                                <td><p class="text-right"></p></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <tr class="border-gray">
+                            <td></td>
+                            <td class="principal-text titulos-big" style="font-size: 14px;">Subtotal Cuenta Corriente</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">409.036,10</p></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">5,17</p></td>
+                            <td></td>
+                            <td></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">0,00</p></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">DIP0 BONOS REP. ARG. SICOUNTS ARS 2010-2033</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold">700,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">44.935,000</p></td>
+                            <td class="text-right"><p class="text-right text-bold">314.545,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">3,98</p></td>
+                            <td class="text-right"><p class="text-right text-bold">43.324,836</p></td>
+                            <td class="text-right"><p class="text-right text-bold">3,72</p></td>
+                            <td class="text-right"><p class="text-right text-bold">11.271,15</p></td>
+                            <td class="text-right">10:33:06</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">T30J6 BONO TESORO NACI CAP V.30/06/26 $ CG</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold">480.000,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">132,350</p></td>
+                            <td class="text-right"><p class="text-right text-bold">635.280,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">8,04</p></td>
+                            <td class="text-right"><p class="text-right text-bold">125,110</p></td>
+                            <td class="text-right"><p class="text-right text-bold">5,79</p></td>
+                            <td class="text-right"><p class="text-right text-bold">34.752,86</p></td>
+                            <td class="text-right">10:39:44</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">TO26 BONO TESORO NAC 15.5 % VTO 17/10/26</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold">1.083.424,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">97,050</p></td>
+                            <td class="text-right"><p class="text-right text-bold">1.051.462,99</p></td>
+                            <td class="text-right"><p class="text-right text-bold">13,30</p></td>
+                            <td class="text-right"><p class="text-right text-bold">92,771</p></td>
+                            <td class="text-right"><p class="text-right text-bold">4,61</p></td>
+                            <td class="text-right"><p class="text-right text-bold">46.362,64</p></td>
+                            <td class="text-right">10:38:18</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">TX31 BONO TESORO $ AJ CER 2,50%  V.30/11/31</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold">25.685,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">1.261,000</p></td>
+                            <td class="text-right"><p class="text-right text-bold">323.887,85</p></td>
+                            <td class="text-right"><p class="text-right text-bold">4,10</p></td>
+                            <td class="text-right"><p class="text-right text-bold">1.174,459</p></td>
+                            <td class="text-right"><p class="text-right text-bold">7,37</p></td>
+                            <td class="text-right"><p class="text-right text-bold">22.227,96</p></td>
+                            <td class="text-right">10:34:27</td>
+                            <td></td>
+                        </tr>
+
+                        <tr class="border-gray">
+                            <td></td>
+                            <td class="principal-text titulos-big" style="font-size: 14px;">Subtotal Titulos Publicos</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">2.325.175,84</p></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">29,42</p></td>
+                            <td></td>
+                            <td></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">114.614,61</p></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">S16M6 LETRA TES. NAC. CAPITALIZABLE 16/03/26 $</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold">2.923.998,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">103,796</p></td>
+                            <td class="text-right"><p class="text-right text-bold">3.034.992,96</p></td>
+                            <td class="text-right"><p class="text-right text-bold">38,40</p></td>
+                            <td class="text-right"><p class="text-right text-bold">102,752</p></td>
+                            <td class="text-right"><p class="text-right text-bold">1,02</p></td>
+                            <td class="text-right"><p class="text-right text-bold">30.520,11</p></td>
+                            <td class="text-right">10:39:47</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">S17A6 L. TES. NACIONAL CAPITALIZABLE 17/04/26</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold">994.826,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">106,395</p></td>
+                            <td class="text-right"><p class="text-right text-bold">1.058.445,12</p></td>
+                            <td class="text-right"><p class="text-right text-bold">13,39</p></td>
+                            <td class="text-right"><p class="text-right text-bold">101,044</p></td>
+                            <td class="text-right"><p class="text-right text-bold">5,30</p></td>
+                            <td class="text-right"><p class="text-right text-bold">53.236,02</p></td>
+                            <td class="text-right">10:39:45</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">S29Y6 LT REP ARG CAP V.29/05/26 $ CG</td>
+                            <td class="text-left">Total</td>
+                            <td class="text-right"><p class="text-right text-bold">859.623,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">123,598</p></td>
+                            <td class="text-right"><p class="text-right text-bold">1.062.476,84</p></td>
+                            <td class="text-right"><p class="text-right text-bold">13,44</p></td>
+                            <td class="text-right"><p class="text-right text-bold">116,913</p></td>
+                            <td class="text-right"><p class="text-right text-bold">5,72</p></td>
+                            <td class="text-right"><p class="text-right text-bold">57.467,43</p></td>
+                            <td class="text-right">10:38:14</td>
+                            <td></td>
+                        </tr>
+                            <tr>
+
+
+                                    <td></td>
+                                <td class="text-left"> </td>
+                                <td class="text-left">Disponible</td>
+                                <td><p class="text-right text-bold">736.358,00</p></td>
+                                    <td><p class="text-right text-bold">123,598</p></td>
+                                <td><p class="text-right text-bold">910.123,76</p></td>
+                                <td><p class="text-right text-bold"></p></td>
+                                <td><p class="text-right"></p></td>
+                                <td><p class="text-right text-bold"></p></td>
+                                <td><p class="text-right text-bold"></p></td>
+                                <td></td>
+                                    <td></td>
+                            </tr>
+                            <tr>
+
+
+                                    <td></td>
+                                <td class="text-left"> </td>
+                                <td class="text-left">Garantia</td>
+                                <td><p class="text-right text-bold">123.265,00</p></td>
+                                    <td><p class="text-right text-bold">123,598</p></td>
+                                <td><p class="text-right text-bold">152.353,07</p></td>
+                                <td><p class="text-right text-bold"></p></td>
+                                <td><p class="text-right"></p></td>
+                                <td><p class="text-right text-bold"></p></td>
+                                <td><p class="text-right text-bold"></p></td>
+                                <td></td>
+                                    <td></td>
+                            </tr>
+
+                        <tr class="border-gray">
+                            <td></td>
+                            <td class="principal-text titulos-big" style="font-size: 14px;">Subtotal Letras</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">5.155.914,91</p></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">65,23</p></td>
+                            <td></td>
+                            <td></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">141.223,56</p></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">GFGC73515A GFG(C) 7,351.500 ABRIL</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold">3,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">212,000</p></td>
+                            <td class="text-right"><p class="text-right text-bold">63.600,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">0,80</p></td>
+                            <td class="text-right"><p class="text-right text-bold">253,420</p></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-16,34</p></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-12.426,05</p></td>
+                            <td class="text-right">10:39:56</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">GFGC77515A GFG(C) 7,751.500 ABRIL</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-6,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">110,000</p></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-66.000,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-0,83</p></td>
+                            <td class="text-right"><p class="text-right text-bold">224,086</p></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-50,91</p></td>
+                            <td class="text-right"><p class="text-right text-bold">68.451,47</p></td>
+                            <td class="text-right">10:39:48</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                                    <td></td>
+                            <td class="text-left">GFGC82282A GFG(C) 8,228.200 ABRIL</td>
+                            <td class="text-left"></td>
+                            <td class="text-right"><p class="text-right text-bold">3,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">55,000</p></td>
+                            <td class="text-right"><p class="text-right text-bold">16.500,00</p></td>
+                            <td class="text-right"><p class="text-right text-bold">0,21</p></td>
+                            <td class="text-right"><p class="text-right text-bold">71,601</p></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-23,19</p></td>
+                            <td class="text-right"><p class="text-right text-bold numero-negativo">-4.980,41</p></td>
+                            <td class="text-right">10:37:17</td>
+                            <td></td>
+                        </tr>
+
+                        <tr class="border-gray">
+                            <td></td>
+                            <td class="principal-text titulos-big" style="font-size: 14px;">Subtotal Opciones</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">14.100,00</p></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">0,18</p></td>
+                            <td></td>
+                            <td></td>
+                            <td><p style="margin: 0px; font-size: 14px; font-weight: 600;text-align: right">51.045,01</p></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="box">
+            <small>* Salvo error u omisión (S.E.U.O.)</small><br>
+                <small>* Res. CNV 731: Conforme las reglamentaciones de los Mercados, la documentación de respaldo de cada operación se encuentra a disposición del cliente.</small>
+        </div>
+    </div>
+
+
+</div>
