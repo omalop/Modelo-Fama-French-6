@@ -42,6 +42,8 @@ sys.path.insert(0, ROOT_DIR)
 
 from src.data.docta_api import DoctaCapitalAPI
 from src.data.cache_docta import CacheDoctaAPI
+from src.data.scraping_screenermatic import obtener_bonos_frescos
+from src.data.historico_embi import obtener_riesgo_pais_fresco
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. CONFIGURACIÓN
@@ -52,6 +54,7 @@ CLIENT_SECRET = os.getenv("DOCTA_CLIENT_SECRET", "_ciyJML_JOgBD89Ft39PL6Az-ps9BJ
 
 RANKING_ARG    = os.path.join(ROOT_DIR, 'data/processed/Ranking_Argentina_Top.xlsx')
 RANKING_SEC    = os.path.join(ROOT_DIR, 'data/processed/Ranking_Global_SEC_Top.xlsx')
+RANKING_INTL   = os.path.join(ROOT_DIR, 'data/processed/Ranking_Global_Intl_Top.xlsx')
 DASHBOARD_PATH = os.path.join(ROOT_DIR,
     'Dashboard de Indicadores Adelantados de Crisis Financiera v2/Original v2/crisis_dashboard_pro.py')
 DASHBOARD_ENV  = os.path.join(ROOT_DIR,
@@ -67,6 +70,14 @@ BONOS_CORPORATIVOS  = {"YFC2O": "YPF Corp HD",
                         "BPOA7": "BOPREAL Serie 3"}
 BONOS_SUBSOBERANOS  = {"PBA25": "Prov. Buenos Aires (25)",
                         "NDT25": "Neuquén (25)"}
+
+# Bonos en Pesos (Tasa Fija / Ajuste CER) para Carry Trade
+BONOS_PESOS_CER     = {"S31L6": "LECAP Jul-26 (ARS)",
+                       "S31G6": "LECAP Ago-26 (ARS)",
+                       "TZXD6": "BONCER Dic-26 (CER)",
+                       "TZXD7": "BONCER Dic-27 (CER)",
+                       "TZX28": "BONCER 2028 (CER)"}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. FUNCIONES AUXILIARES
@@ -145,14 +156,18 @@ def leer_crisis_signals() -> dict:
         return signals
 
 
-def obtener_tasa_descuento(docta: DoctaCapitalAPI) -> tuple[float, str]:
+def obtener_tasa_descuento(df_bonos: pd.DataFrame) -> tuple[float, str]:
     """
-    Obtiene la tasa de descuento local desde la curva soberana ley arg (AL30/AE38).
+    Obtiene la tasa de descuento local desde la curva soberana ley arg (AL30/AE38)
+    utilizando la base de Screenermatic.
     Fallback: Treasury 10Y + EMBI+ estimado.
     """
-    tir = docta.get_bond_yield("AL30") or docta.get_bond_yield("AE38")
-    if tir:
-        return tir, f"AL30/AE38 (Docta API): {tir:.2%}"
+    for tk in ["AL30", "AE38"]:
+        fila = df_bonos[df_bonos['simbolo'] == tk]
+        if not fila.empty and not pd.isna(fila.iloc[0]['tir_pct']):
+            tir_decimal = fila.iloc[0]['tir_pct'] / 100.0
+            return tir_decimal, f"{tk} (Screenermatic): {tir_decimal:.2%}"
+            
     # Fallback sintético
     try:
         tnx = yf.Ticker("^TNX").history(period="5d")['Close'].iloc[-1] / 100
@@ -171,12 +186,58 @@ def estimar_prob_crisis(signals: dict) -> float:
     return sum((signals.get(k, 0) / 2) * p for k, p in pesos.items())
 
 
+def analizar_divergencia_merval_embi(df_embi: pd.DataFrame) -> dict:
+    """
+    Analiza la divergencia a 1 año (estructural) entre el Riesgo País (EMBI) y el mercado local (GGAL proxy).
+    Evita el ruido de corto plazo (30 días) para identificar divergencias macroeconómicas.
+    Retorna un dict con la divergencia detectada e impacto sugerido en allocation.
+    """
+    res = {'tipo': 'Neutral', 'impacto_rv': 0.0, 'mensaje': 'Sin divergencia estructural relevante'}
+    try:
+        # Extraer variación a 1 año GGAL (Proxy Merval USD)
+        ggal_data = yf.Ticker("GGAL").history(period="1y")
+        if ggal_data.empty:
+            return res
+            
+        ggal_hoy = ggal_data['Close'].iloc[-1]
+        ggal_inicio = ggal_data['Close'].iloc[0] # ~ 1 año atrás
+        var_rv = (ggal_hoy / ggal_inicio) - 1.0
+        
+        # Extraer variación anual EMBI (mismos días bursátiles)
+        dias_habiles = len(ggal_data)
+        df_embi_reciente = df_embi.tail(dias_habiles).reset_index(drop=True)
+        embi_hoy = df_embi_reciente['embi_puntos'].iloc[-1]
+        embi_inicio = df_embi_reciente['embi_puntos'].iloc[0]
+        var_embi = (embi_hoy / embi_inicio) - 1.0
+        
+        # Análisis de divergencia macro/estructural
+        # Equities caen o se estancan (< 5%) y Riesgo País colapsa (<-20%) = Divergencia Alcista (compra fuerte RV)
+        if var_rv < 0.05 and var_embi < -0.20:
+            res['tipo'] = 'Divergencia Alcista Estructural'
+            res['impacto_rv'] = 0.15 # Bump de capital hacia Equity
+            res['mensaje'] = f"Riesgo País colapsó {abs(var_embi):.1%} anual y GGAL sigue rezagada ({var_rv:+.1%}). 🚀 Fuerte upside de RV pendiente."
+            
+        # Equities volaron (> 30%) pero el Riesgo País está subiendo (> 5%) = Divergencia Bajista (burbuja RV / riesgo Kuka)
+        elif var_rv > 0.30 and var_embi > 0.05:
+            res['tipo'] = 'Divergencia Bajista Estructural'
+            res['impacto_rv'] = -0.20 # Recorte severo en Equity para fugar a RF
+            res['mensaje'] = f"GGAL voló {var_rv:+.1%} anual, pero el EMBI sube ({var_embi:+.1%}). 📉 Alerta de corrección / Burbuja RV."
+            
+        else:
+            res['mensaje'] = f"Correlación macro consistente. GGAL 1A: {var_rv:+.1%} | EMBI 1A: {var_embi:+.1%}"
+            
+    except Exception as e:
+        logger.warning(f"Error analizando divergencia: {e}")
+        
+    return res
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. MOTOR DE ALLOCATION TRES PILARES
 # ─────────────────────────────────────────────────────────────────────────────
 
 def calcular_allocation_global(
-    pe_arg: float, pe_global: float, tasa_dto: float, prob_crisis: float
+    pe_arg: float, pe_global: float, tasa_dto: float, prob_crisis: float, impacto_divergencia: float = 0.0
 ) -> dict:
     """
     Determina la distribución óptima entre los tres pilares.
@@ -218,23 +279,57 @@ def calcular_allocation_global(
 
     rv_disponible = 1.0 - peso_rf
 
-    # Split local vs global proporcional a sus Yield Gaps positivos
+    # ── Pisos mínimos de diversificación (nunca menos de X% en ningún pilar) ───
+    # Fuente: Black-Litterman (1992), Solnik (1974) - diversificación mínima obligatoria
+    PISO_RV_LOCAL  = 0.15   # Mínimo 15% en acciones locales
+    PISO_RV_GLOBAL = 0.15   # Mínimo 15% en acciones globales
+    PISO_RF_LOCAL  = 0.20   # Mínimo 20% en renta fija (Markowitz 1952: amortiguador mínimo institucional)
+
+    # Total de pisos reservados: el resto se distribuye dinámicamente
+    total_pisos = PISO_RV_LOCAL + PISO_RV_GLOBAL + PISO_RF_LOCAL    # = 0.45
+    excedente   = max(0.0, 1.0 - total_pisos)                        # = 0.55
+
+    # Distribuir el excedente con la lógica cuantitativa del Yield Gap
     total_bruto = rv_local_bruto + rv_global_bruto
     if total_bruto == 0:
-        # Sin ventaja en ninguno: dividir equitativamente
-        peso_local  = rv_disponible * 0.50
-        peso_global = rv_disponible * 0.50
+        # Sin ventaja: Local y Global se reparten equitativamente el excedente de equity
+        frac_local  = 0.50
+        frac_global = 0.50
+        frac_rf     = 0.00
     else:
-        peso_local  = rv_disponible * (rv_local_bruto  / total_bruto)
-        peso_global = rv_disponible * (rv_global_bruto / total_bruto)
+        # RF captura excedente proporcional a su señal defensiva (inverse yield gap)
+        frac_local  = rv_local_bruto  / total_bruto
+        frac_global = rv_global_bruto / total_bruto
+        frac_rf     = 0.00  # Excedente va a equities; el RF ya tiene su piso cubierto
+
+    # Ajustar fraccion local por divergencia estructural (ventana 1 año)
+    frac_local = max(0.0, frac_local + impacto_divergencia)
+    # Renormalizar fracciones de equity
+    total_frac = frac_local + frac_global
+    if total_frac > 0:
+        frac_local  /= total_frac
+        frac_global /= total_frac
+
+    # Pesos finales = piso + porción del excedente
+    excedente_rv = excedente * (1.0 - frac_rf)
+    peso_local  = round(PISO_RV_LOCAL  + excedente_rv * frac_local,  4)
+    peso_global = round(PISO_RV_GLOBAL + excedente_rv * frac_global, 4)
+    peso_rf     = round(1.0 - peso_local - peso_global,              4)
+
+    # Garantía final: si RF quedó < su piso por redondeo, compensar desde local
+    if peso_rf < PISO_RF_LOCAL:
+        diff = PISO_RF_LOCAL - peso_rf
+        peso_local = round(peso_local - diff, 4)
+        peso_rf    = PISO_RF_LOCAL
+
 
     return {
-        'RV_Local':         round(peso_local,  4),
-        'RV_Global':        round(peso_global, 4),
-        'RF_Local':         round(peso_rf,     4),
-        'Yield_Gap_Local':  round(yg_local,    4),
-        'Yield_Gap_Global': round(yg_global,   4),
-        'Prob_Crisis':      round(prob_crisis,  4),
+        'RV_Local':         peso_local,
+        'RV_Global':        peso_global,
+        'RF_Local':         peso_rf,
+        'Yield_Gap_Local':  round(yg_local,   4),
+        'Yield_Gap_Global': round(yg_global,  4),
+        'Prob_Crisis':      round(prob_crisis, 4),
     }
 
 
@@ -254,10 +349,11 @@ def distribuir_intra_pilar(df_ranking: pd.DataFrame, n: int, peso_total: float) 
     return top[['Ticker', 'Sector', 'Final_Score', 'Peso_Total']]
 
 
-def obtener_yields_bonos(docta: DoctaCapitalAPI) -> dict:
+def obtener_yields_bonos(df_bonos: pd.DataFrame) -> dict:
     """
-    Descarga yields intradiarios de los tres segmentos de RF.
-    Retorna dict {ticker: {'desc': str, 'tir': float, 'segmento': str}}
+    Extrae TIR, Modified Duration, Convexidad, y Paridad desde el DataFrame
+    de Screenermatic para los 3 segmentos de RF.
+    Retorna dict {ticker: {'desc': str, 'segmento': str, 'tir': float, 'md': float, 'cvx': float, 'paridad': float}}
     """
     todos = {}
     for ticker, desc in BONOS_SOBERANOS.items():
@@ -266,10 +362,22 @@ def obtener_yields_bonos(docta: DoctaCapitalAPI) -> dict:
         todos[ticker] = {'desc': desc, 'segmento': 'Corporativo'}
     for ticker, desc in BONOS_SUBSOBERANOS.items():
         todos[ticker] = {'desc': desc, 'segmento': 'Subsoberano'}
+    for ticker, desc in BONOS_PESOS_CER.items():
+        todos[ticker] = {'desc': desc, 'segmento': 'Pesos/CER'}
 
     for ticker in todos:
-        tir = docta.get_bond_yield(ticker)
-        todos[ticker]['tir'] = tir
+        fila = df_bonos[df_bonos['simbolo'] == ticker]
+        if not fila.empty:
+            tir = fila.iloc[0].get('tir_pct')
+            todos[ticker]['tir'] = tir / 100.0 if pd.notna(tir) else None
+            todos[ticker]['md'] = fila.iloc[0].get('modified_dur')
+            todos[ticker]['cvx'] = fila.iloc[0].get('convexidad')
+            todos[ticker]['paridad'] = fila.iloc[0].get('paridad_pct')
+        else:
+            todos[ticker]['tir'] = None
+            todos[ticker]['md'] = None
+            todos[ticker]['cvx'] = None
+            todos[ticker]['paridad'] = None
 
     return todos
 
@@ -285,20 +393,24 @@ if __name__ == "__main__":
     SEP = "=" * 65
 
     print(f"\n{SEP}")
-    print("🏛️   ALLOCATION TRES PILARES  —  CARTERA INTEGRAL")
+    print("\U0001f3db\ufe0f   ALLOCATION TRES PILARES  \u2014  CARTERA INTEGRAL")
     print(f"{SEP}")
 
-    # ── 1. Conexión Docta con caché DuckDB (TTL 7 días por instrumento) ───
-    print("\n⏳ [1/5] Inicializando cliente Docta Capital con caché local...")
+    # ── 0. Imagen Presidencial (hardcodeada según conviccion del usuario) ───
+    # Imagen de Gobierno = 56% (Mar-2026).
+    # Ajustar este valor cuando cambien las encuestas de imagen presidencial.
+    confianza_gobierno: float = 56.0
+    logger.info(f"Imagen presidencial configurada: {confianza_gobierno}%")
+
+    # ── 1. Obtener Datos (Screenermatic Cache y EMBI Histórico) ───
+    print("\n⏳ [1/5] Inicializando datos y Riesgo País...")
     try:
-        _docta_raw = DoctaCapitalAPI(CLIENT_ID, CLIENT_SECRET)
-        docta = CacheDoctaAPI(_docta_raw)   # <-- usa caché, max 1 llamado/semana/instrumento
-        llamados_semana = docta.llamados_esta_semana()
-        print(f"   ✅ Token OK  |  Llamados reales esta semana: {llamados_semana}")
-        if llamados_semana > 0:
-            print("   ℹ️  Los datos cacheados se usarán hasta que venza el TTL (7 días).")
+        df_bonos = obtener_bonos_frescos(forzar=False)
+        df_embi  = obtener_riesgo_pais_fresco(forzar=False)
+        print(f"   ✅ Bonos Screenermatic cargados: {len(df_bonos)} instrumentos.")
+        print(f"   ✅ EMBI+ Histórico cargado: {len(df_embi)} registros, últ: {df_embi['embi_puntos'].iloc[-1]} pts.")
     except Exception as e:
-        print(f"   ❌ {e}")
+        print(f"   ❌ Error cargando datos externos: {e}")
         sys.exit(1)
 
     # ── 2. Leer Rankings ─────────────────────────────────────────────
@@ -310,27 +422,41 @@ if __name__ == "__main__":
         print(f"   ❌ Ranking Argentina no disponible: {e}")
         df_arg = pd.DataFrame()
 
+    # Global Unificado
     try:
-        df_sec = pd.read_excel(RANKING_SEC).sort_values('Final_Score', ascending=False)
-        print(f"   ✅ Global SEC: {len(df_sec)} tickers  |  Top 10 seleccionados")
+        df_sec = pd.read_excel(RANKING_SEC)
     except Exception as e:
-        print(f"   ❌ Ranking Global SEC no disponible: {e}")
         df_sec = pd.DataFrame()
+        logger.warning(f"Ranking Global SEC no disponible: {e}")
+
+    try:
+        df_intl = pd.read_excel(RANKING_INTL)
+    except Exception as e:
+        df_intl = pd.DataFrame()
+        logger.warning(f"Ranking Global Intl no disponible: {e}")
+
+    if df_sec.empty and df_intl.empty:
+        print("   ❌ Ambos rankings globales (SEC e INTL) no disponibles")
+        df_global_unificado = pd.DataFrame()
+    else:
+        df_global_unificado = pd.concat([df_sec, df_intl], ignore_index=True)
+        df_global_unificado = df_global_unificado.sort_values('Final_Score', ascending=False)
+        print(f"   ✅ Global Unificado (SEC+Intl): {len(df_global_unificado)} tickers combinados | Top 10 seleccionados")
 
     # ── 3. P/E de cada universo ──────────────────────────────────────
     print("\n📊 [3/5] Calculando Earnings Yield de cada universo...")
     tickers_arg_top5  = df_arg['Ticker'].head(5).tolist()  if not df_arg.empty  else []
-    tickers_sec_top10 = df_sec['Ticker'].head(10).tolist() if not df_sec.empty else []
+    tickers_glbl_top10 = df_global_unificado['Ticker'].head(10).tolist() if not df_global_unificado.empty else []
 
     pe_arg,    pe_dict_arg    = obtener_pe_ponderado(tickers_arg_top5)
-    pe_global, pe_dict_global = obtener_pe_ponderado(tickers_sec_top10)
+    pe_global, pe_dict_global = obtener_pe_ponderado(tickers_glbl_top10)
 
-    print(f"   P/E LOCAL  (Top 5 ARG):       {pe_arg:.1f}x  →  E/P: {1/pe_arg:.2%}")
-    print(f"   P/E GLOBAL (Top 10 SEC):       {pe_global:.1f}x  →  E/P: {1/pe_global:.2%}")
+    print(f"   P/E LOCAL  (Top 5 ARG):        {pe_arg:.1f}x  →  E/P: {1/pe_arg:.2%}")
+    print(f"   P/E GLOBAL (Top 10 Unif.):     {pe_global:.1f}x  →  E/P: {1/pe_global:.2%}")
 
     # ── 4. Tasa de descuento + Crisis ───────────────────────────────
     print("\n🚦 [4/5] Tasa de descuento + señales de crisis...")
-    tasa_dto, tasa_label = obtener_tasa_descuento(docta)
+    tasa_dto, tasa_label = obtener_tasa_descuento(df_bonos)
     print(f"   Tasa Descuento Local: {tasa_label}")
 
     signals = leer_crisis_signals()
@@ -341,9 +467,15 @@ if __name__ == "__main__":
     print(f"   VIX          → {iconos.get(signals['VIX'],'⚫')} Nivel {signals['VIX']}")
     print(f"   Prob. Crisis Sistémica: {prob_c:.1%}")
 
+    # ── 4.5. Divergencias Merval vs EMBI ────────────────────────────────
+    print("\n📡 Analizando Indicadores Adelantados: RF vs RV...")
+    divergencia = analizar_divergencia_merval_embi(df_embi)
+    print(f"   → Estado Táctico: {divergencia['tipo']}")
+    print(f"   → Racionalidad:   {divergencia['mensaje']}")
+
     # ── 5. Allocation ────────────────────────────────────────────────
     print("\n⚙️  [5/5] Calculando allocation óptimo...")
-    alloc = calcular_allocation_global(pe_arg, pe_global, tasa_dto, prob_c)
+    alloc = calcular_allocation_global(pe_arg, pe_global, tasa_dto, prob_c, divergencia['impacto_rv'])
 
     # ─── OUTPUT FINAL ─────────────────────────────────────────────────
     rv_local_pct  = alloc['RV_Local']  * 100
@@ -357,8 +489,8 @@ if __name__ == "__main__":
     print(f"\n{SEP}")
     print("🎯  ASIGNACIÓN DE CAPITAL  —  TRES PILARES")
     print(f"{SEP}")
-    print(f"\n  📈  RV Local  (ARG)  [{barra(rv_local_pct)}]   {rv_local_pct:>5.1f}%")
-    print(f"  🌎  RV Global (SEC)  [{barra(rv_global_pct)}]   {rv_global_pct:>5.1f}%")
+    print(f"\n  📈  RV Local   (ARG)       [{barra(rv_local_pct)}]   {rv_local_pct:>5.1f}%")
+    print(f"  🌎  RV Global  (SEC+INTL)  [{barra(rv_global_pct)}]   {rv_global_pct:>5.1f}%")
     print(f"  🛡️   RF Local        [{barra(rf_pct)}]   {rf_pct:>5.1f}%")
     print(f"\n  Yield Gap Local:   {alloc['Yield_Gap_Local']:+.2%}   |   "
           f"Yield Gap Global: {alloc['Yield_Gap_Global']:+.2%}")
@@ -378,12 +510,12 @@ if __name__ == "__main__":
     else:
         print("  ⚠️  Sin datos de ranking ARG o peso = 0.")
 
-    # ─── PILAR 2: RV GLOBAL ───────────────────────────────────────────
+    # ─── PILAR 2: RV GLOBAL UNIFICADO ─────────────────────────────────
     print(f"\n{'─'*65}")
-    print(f"🌎  PILAR 2 — RENTA VARIABLE GLOBAL SEC  ({rv_global_pct:.1f}% del capital)")
+    print(f"🌎  PILAR 2 — RENTA VARIABLE GLOBAL (UNIFICADO)  ({rv_global_pct:.1f}% del capital)")
     print(f"{'─'*65}")
-    if not df_sec.empty and alloc['RV_Global'] > 0:
-        top_sec = distribuir_intra_pilar(df_sec, 10, alloc['RV_Global'])
+    if not df_global_unificado.empty and alloc['RV_Global'] > 0:
+        top_sec = distribuir_intra_pilar(df_global_unificado, 10, alloc['RV_Global'])
         print(f"  {'Ticker':<10} {'Sector':<25} {'FF Score':>8}  {'% Capital':>10}")
         print(f"  {'-'*60}")
         for _, row in top_sec.iterrows():
@@ -391,41 +523,126 @@ if __name__ == "__main__":
             print(f"  {row['Ticker']:<10} {str(row['Sector']):<25} {row['Final_Score']:>8.2f}  "
                   f"{row['Peso_Total']*100:>8.1f}%   ({pe_str})")
     else:
-        print("  ⚠️  Sin datos de ranking SEC o peso = 0.")
+        print("  ⚠️  Sin datos de ranking global o peso = 0.")
 
     # ─── PILAR 3: RF LOCAL ────────────────────────────────────────────
     print(f"\n{'─'*65}")
     print(f"🛡️   PILAR 3 — RENTA FIJA LOCAL  ({rf_pct:.1f}% del capital)")
     print(f"{'─'*65}")
-    print("  Obteniendo TIRs en tiempo real...\n")
-    yields_bonos = obtener_yields_bonos(docta)
+    yields_bonos = obtener_yields_bonos(df_bonos)
 
-    # Agrupar por segmento
-    for segmento in ['Soberano', 'Subsoberano', 'Corporativo']:
+    # Agrupar por segmento y guardar bonos viables para sugerencia
+    bonos_viables_hd = []
+    bonos_viables_pesos = []
+    for segmento in ['Soberano', 'Subsoberano', 'Corporativo', 'Pesos/CER']:
         print(f"  [{segmento.upper()}]")
         for ticker, info in yields_bonos.items():
             if info['segmento'] != segmento:
                 continue
             tir = info['tir']
             if tir is not None:
-                marca = "⭐" if tir >= 0.07 else "  "
-                # Arbitraje GD vs AL (si aplica)
-                gd_par = {"AL30": "GD30", "AE38": "GD38", "AL35": "GD35"}.get(ticker)
-                spread_str = ""
-                if gd_par:
-                    tir_gd = docta.get_bond_yield(gd_par)
-                    if tir_gd:
-                        spread = tir_gd - tir
-                        spread_str = f"  |  vs {gd_par}: {spread:+.2%}"
-                        if spread > 0.003:
-                            spread_str += " ⚡ ARBIT."
-                print(f"  {marca}  {ticker:<8} {info['desc']:<30}  TIR: {tir:.2%}{spread_str}")
+                paridad = info.get('paridad') or 0
+                cvx = info.get('cvx') or 0
+                md = info.get('md') or 0
+                
+                # Criterios dinámicos según el segmento/moneda
+                if segmento == 'Pesos/CER':
+                    # TIR real positiva o nominal atractiva, paridad no tan restringida (<110)
+                    es_viable = tir >= 0.02 and md < 5 and paridad < 110
+                else:
+                    # Riesgo Hard Dollar standard
+                    es_viable = tir >= 0.07 and md < 5 and paridad < 100
+
+                marca = "⭐" if es_viable else "  "
+                
+                print(f"  {marca}  {ticker:<8} {info['desc']:<30}  TIR: {tir:.2%}  |  MD: {md:.2f}  |  CVX: {cvx:.2f}  |  Paridad: {paridad:.1f}%")
+                
+                if es_viable:
+                    b_dict = {
+                        'Ticker': ticker,
+                        'Desc': info['desc'],
+                        'TIR': tir
+                    }
+                    if segmento == 'Pesos/CER':
+                        bonos_viables_pesos.append(b_dict)
+                    else:
+                        bonos_viables_hd.append(b_dict)
             else:
                 print(f"       {ticker:<8} {info['desc']:<30}  Sin datos hoy")
         print()
 
+    # Distribución Dinámica por Riesgo Político
+    peso_rel_pesos = max(0.1, min(0.9, confianza_gobierno / 100.0))
+    peso_rel_hd = 1.0 - peso_rel_pesos
+    
+    if not bonos_viables_pesos and bonos_viables_hd:
+        peso_rel_hd = 1.0; peso_rel_pesos = 0.0
+    elif not bonos_viables_hd and bonos_viables_pesos:
+        peso_rel_pesos = 1.0; peso_rel_hd = 0.0
+        
+    peso_rf_pesos = alloc['RF_Local'] * peso_rel_pesos
+    peso_rf_hd = alloc['RF_Local'] * peso_rel_hd
+    
+    print(f"  ⚖️  Ajuste por Imagen Presidencial ({confianza_gobierno}%):")
+    print(f"      → Ponderación Renta Fija: {peso_rel_pesos*100:.1f}% Pesos/CER | {peso_rel_hd*100:.1f}% Hard Dollar\n")
+
     print(f"  ℹ️  Estrategia: Buy & Hold. Revisar mensualmente.")
     print(f"  ℹ️  Los GD (ley NY) se sugieren SOLO si spread vs AL > 30 bps.")
+
+    # ─── EXPORTACIÓN A CSV ────────────────────────────────────────────
+    cartera_csv = []
+    
+    if not df_arg.empty and alloc['RV_Local'] > 0:
+        for _, row in top_arg.iterrows():
+            cartera_csv.append({
+                'Ticker': row['Ticker'],
+                'Instrumento': 'RV_Local',
+                'Peso_Sugerido': round(row['Peso_Total'], 4),
+                'Retorno_Esperado': round(row['Final_Score'], 2)
+            })
+            
+    if not df_global_unificado.empty and alloc['RV_Global'] > 0:
+        for _, row in top_sec.iterrows():
+            cartera_csv.append({
+                'Ticker': row['Ticker'],
+                'Instrumento': 'RV_Global',
+                'Peso_Sugerido': round(row['Peso_Total'], 4),
+                'Retorno_Esperado': round(row['Final_Score'], 2)
+            })
+
+    if rf_pct > 0:
+        if bonos_viables_pesos or bonos_viables_hd:
+            if bonos_viables_pesos:
+                peso_por_bono = peso_rf_pesos / len(bonos_viables_pesos)
+                for b in bonos_viables_pesos:
+                    cartera_csv.append({
+                        'Ticker': b['Ticker'],
+                        'Instrumento': f"RF_Local_Pesos ({b['Desc']})",
+                        'Peso_Sugerido': round(peso_por_bono, 4),
+                        'Retorno_Esperado': round(b['TIR'], 4)
+                    })
+            if bonos_viables_hd:
+                peso_por_bono = peso_rf_hd / len(bonos_viables_hd)
+                for b in bonos_viables_hd:
+                    cartera_csv.append({
+                        'Ticker': b['Ticker'],
+                        'Instrumento': f"RF_Local_HD ({b['Desc']})",
+                        'Peso_Sugerido': round(peso_por_bono, 4),
+                        'Retorno_Esperado': round(b['TIR'], 4)
+                    })
+        else:
+            # Fallback si no hay bonos viables > 7%
+            cartera_csv.append({
+                'Ticker': 'RF_RESERVA',
+                'Instrumento': 'Renta_Fija_Reserva',
+                'Peso_Sugerido': round(alloc['RF_Local'], 4),
+                'Retorno_Esperado': round(tasa_dto, 4)
+            })
+
+    df_cartera = pd.DataFrame(cartera_csv)
+    output_path = os.path.join(ROOT_DIR, 'data/processed/Portfolio_Recommendation.csv')
+    df_cartera.to_csv(output_path, index=False)
+    print(f"\n📁 Recomendación de Cartera exportada a: {output_path}")
 
     # ─── RESUMEN FINAL ────────────────────────────────────────────────
     print(f"\n{SEP}")
@@ -436,7 +653,7 @@ if __name__ == "__main__":
     if not df_arg.empty and alloc['RV_Local'] > 0:
         for _, row in top_arg.iterrows():
             print(f"  {row['Ticker']:<30} {row['Peso_Total']*100:>9.1f}%")
-    if not df_sec.empty and alloc['RV_Global'] > 0:
+    if not df_global_unificado.empty and alloc['RV_Global'] > 0:
         for _, row in top_sec.iterrows():
             print(f"  {row['Ticker']:<30} {row['Peso_Total']*100:>9.1f}%")
     print(f"  {'RENTA FIJA (total)':30} {rf_pct:>9.1f}%")

@@ -1,62 +1,172 @@
-# Metodología Científica - Modelo Fama-French 6 + Optimizador Dinámico
+# Metodología Científica — Modelo Fama-French 6 + Optimizador Tres Pilares
 
-## 1. Introducción y Objetivo
-Este proyecto tiene como objetivo la implementación de un sistema de inversión robusto basado en fundamentos académicos de finanzas cuantitativas y análisis técnico avanzado. El sistema busca maximizar la **Esperanza Matemática** de los retornos mediante un enfoque "Quantamental" que selecciona activos óptimos y, crucialmente, **determina la exposición dinámica entre renta variable y liquidez (renta fija corporativa/soberana como resguardo)** en base a modelos de ciclo y probabilidad de crisis.
+*Versión: Mar-2026 · Bajo los Artículos 2, 4, 7 y 8 de la Constitución Antigravity.*
 
-Está dirigido a analistas cuantitativos e inversores que rechazan paradigmas tradicionales y estáticos (ej. 60/40), exigiendo en su lugar una gestión dinámica fundamentada en modelos probabilísticos y macroeconómicos regidos por el actual contexto argentino.
+---
+
+## 1. Objetivo y Filosofía del Sistema
+
+El sistema implementa una gestión de cartera **"Quantamental"**: cuantitativa en la selección de activos, y macroeconómicamente consciente en la asignación de capital entre los tres pilares fundamentales:
+
+1. **Renta Variable Local** (acciones argentinas)
+2. **Renta Variable Global** (acciones internacionales SEC e INTL)
+3. **Renta Fija Local** (bonos en USD Hard Dollar y en ARS — LECAPs, CER)
+
+El principio rector es que **nunca ningún pilar tiene 0% de exposición**, garantizando diversificación mínima a nivel institucional (Black-Litterman, 1992; Solnik, 1974).
+
+---
 
 ## 2. Fundamentos Teóricos
 
 ### A. Modelo de 6 Factores de Fama-French
-El núcleo fundamental del modelo se basa en la extensión del modelo de tres factores original de Fama y French.
-- **Mercado (Mkt-RF), Tamaño (SMB), Valor (HML), Rentabilidad (RMW), Inversión (CMA), Momentum (MOM).**
+El núcleo de selección de activos es la extensión del modelo de 3 factores de Fama y French (2015).
 
-**Referencia:** Fama, E. F., & French, K. R. (2015). "A five-factor asset pricing model". Journal of Financial Economics.
+**Factores modelados:**
+- **Mercado (Mkt-RF):** Prima de riesgo sistémico.
+- **Tamaño (SMB):** Small Minus Big — empresas chicas vs. grandes.
+- **Valor (HML):** High Minus Low — empresas baratas (book/price alto) vs. caras.
+- **Rentabilidad (RMW):** Robust Minus Weak — alta rentabilidad operacional.
+- **Inversión (CMA):** Conservative Minus Aggressive — empresas que invierten conservadoramente.
+- **Momentum (MOM):** Factor de continuación de tendencia (Jegadeesh & Titman, 1993).
 
-### B. Optimizador Dinámico (Regime-Switching y Prima de Riesgo)
-Para salir del modelo estático, la distribución de capital (Asset Allocation) se rige por un Optimizador Dinámico Cuántico que procesa la Esperanza Matemática y detecta desajustes entre Renta Fija y Renta Variable.
-
-**1. Evaluación de Renta Fija Local y Proxys de Liquidez:**
-Bajo el contexto macroeconómico de "Shock Fiscal" y "Emisión Cero" (Escuela Austríaca / Gestión Milei), la renta fija corporativa (ej. ONs de Energía e Infraestructura) asume el rol de **activo libre de riesgo local** o resguardo de capital. Históricamente, en crisis de liquidez, estas obligaciones negociables demostraron resiliencia estructural, rindiendo de manera sostenida (TIR/Exit Yield esperada ~8%). 
-El modelo emplea esta renta fija no para *momentum trade*, sino estrictamente como "Buy and Hold" o estacionamiento táctico.
-
-**2. Yield Gap Digno (Prima de Riesgo Soberana Relativa):**
-El marco estático asume una tasa libre de riesgo constante. En un mercado emergente y volátil como Argentina, el ancla obligatoria es la métrica de riesgo soberano continuo. 
-`Tasa de Descuento Local = Tasa Treasury Y10 (Libre de Riesgo USA) + EMBI+ Argentina (Riesgo País)`
-
-El modelo evalúa el *mispricing* de la renta variable mediante:
-`Yield Gap = (E/P de Renta Variable Local) - (Tasa de Descuento Local)`
-Cuando la prima de riesgo que ofrece la renta variable es inferior al Riesgo País compensado, indica extrema sobrevaloración de la Renta Variable frente a la Renta Fija. Este spread puede consultarse en tiempo real utilizando flujos verdaderos a través del motor *Docta Capital*.
-
-**3. Detección de Modos de Riesgo Extremo (Validación del Dashboard de Crisis):**
-Se conservan y validan académicamente los siguientes predictores de *crisis_dashboard_pro.py*:
-- **Inversión de Curva (10Y-2Y):** Ampliamente documentado por Estrella y Mishkin (1998) como el predictor más contundente de recesiones económicas norteamericanas con 12-18 meses de adelanto.
-- **US High Yield Spread:** Según Gilchrist y Zakrajšek (2012), la expansión del exceso de prima de los bonos corporativos HY es un indicador sumamente robusto de contracciones del crédito con impacto sistémico y global, forzando un *flight to quality* o *flight to liquidity* (vaciando posiciones de emergentes).
-- **VIX:** Medida proxy del temor del mercado, esencial en modelos GARCH asimétricos para calcular *Value at Risk*.
-
-Estas tres señales combinadas modulan el "Expected Shortfall" del optimizador.
-
-**Referencia:** 
-- Estrada, J. (2000). "The Cost of Equity in Emerging Markets: A Downside Risk Approach". Emerging Markets Quarterly.
-- Yardeni, E. (1997). "Fed's Stock Market Model".
-
-### C. Optimización Black-Litterman Modificada
-El optimizador matemático aplica Black-Litterman pero con un Prior dominado por el **Régimen de Mercado**.
-- En Modo "Normal", el capital se aloja en Renta Variable según factores Fama-French y vistas Domènec.
-- En Modo "Anómalo/Crisis", la diagonal de Incertidumbre (Omega) estalla, llevando el posterior BL al activo refugio (ONs y bonos soberanos como el GD35 para perfiles agresivos).
-
-## 3. Descripción de Procesos Básica
-| Proceso | Objetivo Científico | Salida Principal |
-| :--- | :--- | :--- |
-| **Screener Fama-French** | Normalizar Z-Score de balances. | `Ranking_Global_Top.xlsx` |
-| **Detección Crisis / Riesgo** | Evaluar VIX, Curva Tipos y Yield Corp. | Matriz de Estado (P(Crisis)) |
-| **Optimizador Cuántico** | Asset Allocation Dinámico | Ponderación Renta Variable vs Fija |
-| **Generador BL** | Asignación intradiaria de los activos de RV. | Pesos de Cartera (%) |
-
-## 4. Limitaciones y Supuestos
-- **Supuesto de Muestra:** Se asume Muestra n >= 30 para todos los tests estadísticos.
-- **Normalidad de Retornos:** Sometido a validación test Shapiro-Wilk en ejecución; en caso de fallo, se recurre a métricas de distribución empírica pesada (no-paramétricas).
-- **Riesgo Sistémico Local:** El modelo asume continuidad parcial en el estado legal de los bonos macro (No Default a corto plazo) apoyado en las métricas de superávit de NotebookLM.
+**Referencia principal:** Fama, E.F. & French, K.R. (2015). *"A five-factor asset pricing model."* Journal of Financial Economics, 116(1), 1–22.
 
 ---
-*Documento generado bajo los Artículos 2, 4 y 8 de la Constitución Antigravity.*
+
+### B. Yield Gap y Prima de Riesgo Argentina
+
+El modelo evalúa el atractivo relativo de la renta variable frente a la renta fija mediante el **Yield Gap**:
+
+```
+Tasa de Descuento Local  = TIR_bono_soberano_líquido  (AL30 o AE38 desde Screenermatic)
+Yield Gap Local          = (E/P de RV local)  - Tasa de Descuento Local
+Yield Gap Global         = (E/P de RV global) - Tasa de Descuento Local
+```
+
+- Si `Yield Gap > 0`: La renta variable paga más que los bonos → favorece equity.
+- Si `Yield Gap < 0`: Los bonos son más atractivos → defense en renta fija.
+
+**Supuesto:** La TIR del bono soberano líquido (AL30/AE38) ya contiene matemáticamente el Riesgo País (EMBI+), por lo que actúa como benchmark local de tasa libre de riesgo ajustada.
+
+**Referencia:** Yardeni, E. (1997). *"Fed's Stock Market Model."* & Estrada, J. (2000). *"The Cost of Equity in Emerging Markets: A Downside Risk Approach."*
+
+---
+
+### C. Detección de Crisis Sistémica
+
+Tres señales macroeconómicas modulan el peso en renta variable:
+
+| Señal | Nivel 0 | Nivel 1 | Nivel 2 | Fuente |
+|---|---|---|---|---|
+| **Inversión Curva (10Y-2Y)** | Normal | Plana | Invertida | Estrella & Mishkin (1998) |
+| **US High Yield Spread** | Normal | Elevado | Crítico | Gilchrist & Zakrajšek (2012) |
+| **VIX** | < 20 | 20–30 | > 30 | Black (1976); GARCH asimétrico |
+
+La probabilidad de crisis se estima con ponderación académica:
+```python
+P_crisis = Σ (señal_i / 2) × peso_i
+# pesos: Curva=0.45, HY=0.35, VIX=0.20
+```
+Un `P_crisis` elevado penaliza ambos pilares de renta variable (castigo no lineal: `P^1.5`).
+
+---
+
+### D. Indicador Adelantado de Divergencia EMBI vs. Merval
+
+**Fundamento:** El precio de los activos argentinos en USD (proxeado por GGAL ADR) debe moverse en correlación inversa fuerte con el Riesgo País (EMBI+). Cuando esta correlación se rompe durante ventanas prolongadas (1 año), configura una **divergencia estructural** que suele anticipar un movimiento de ajuste en la dirección de la señal del bono.
+
+**Ventana de análisis: 1 año** (evita el ruido de señales de 30 días).
+
+| Divergencia | Condición | Interpretación | Ajuste táctico |
+|---|---|---|---|
+| **Alcista Estructural** | EMBI cae >20% y GGAL <+5% | RV local rezagada, convergencia pendiente | +15% en RV Local |
+| **Bajista Estructural** | GGAL sube >30% y EMBI sube >5% | Burbuja de RV local no respaldada por fundamentos soberanos | -20% en RV Local |
+| **Neutral** | Correlación histórica | Sin señal | Sin ajuste |
+
+**Fuente de datos:** Historial EMBI+ desde 1999 (API Ámbito) persistido en DuckDB. GGAL (Yahoo Finance, período `1y`).
+
+---
+
+### E. Selección de Renta Fija — Criterios Multi-Métrica
+
+Se abandonó la selección exclusiva por TIR en favor de un enfoque de **tres métricas simultáneas** (Jorion, 2007):
+
+| Métrica | Umbral Hard Dollar | Umbral ARS/CER | Rol |
+|---|---|---|---|
+| **TIR** | ≥ 7% | ≥ 2% real | Rendimiento mínimo atractivo |
+| **Modified Duration (MD)** | < 5 años | < 5 años | Control de riesgo de tasa de interés |
+| **Paridad** | < 100% | < 110% | Descuento respecto al valor nominal |
+
+Solo los bonos que superan los 3 filtros simultáneamente reciben el marcador ⭐ y son elegibles para la cartera.
+
+**Referencia:** Jorion, P. (2007). *"Value at Risk: The New Benchmark for Managing Financial Risk."* McGraw-Hill, Cap. 5.
+
+---
+
+### F. Mezcla USD vs. ARS — Ajuste Macro por Imagen Presidencial
+
+La proporción entre renta fija en dólares (Hard Dollar) y en pesos (LECAPs, BONCERs CER) se determina dinámicamente por el **índice de confianza/imagen positiva del gobierno**:
+
+```
+peso_relativo_pesos  = confianza_gobierno / 100
+peso_relativo_hd     = 1 - peso_relativo_pesos
+```
+
+**Fundamento económico:** En regímenes de ajuste fiscal ortodoxo (Escuela Austríaca), una alta confianza en la continuidad de políticas de ancla cambiaria y superávit fiscal reduce el riesgo de devaluación, haciendo al **Carry Trade en pesos** (LECAPs/CER) más atractivo que el Hard Dollar.
+
+**Supuesto de validez:** El ajuste es válido mientras la política macroeconómica se mantenga sin cambio de régimen. Ante una señal de cambio (pérdida electoral, cambio de ministro clave), reconfigurar `confianza_gobierno` con un valor menor.
+
+**Configuración actual:** `confianza_gobierno = 56.0` (imagen positiva de Mar-2026).
+
+---
+
+### G. Pisos Mínimos de Diversificación — Anti-Concentración
+
+**Fundamento:** Solnik (1974) mostró matemáticamente que la diversificación internacional reduce la varianza del portafolio incluso cuando los retornos esperados de los activos globales son menores que los locales. French & Poterba (1991) documentaron el sesgo de "Home Bias" como una fuente sistemática de riesgo no compensado.
+
+| Pilar | Piso Mínimo | Justificación |
+|---|---|---|
+| RV Local | 15% | Participación mínima en el ciclo económico local |
+| RV Global | 15% | Diversificación de riesgo país obligatoria (Solnik, 1974) |
+| RF Local | 20% | Amortiguador mínimo institucional (Markowitz, 1952) |
+
+El excedente (45% restante sobre los pisos) se distribuye dinámicamente según el Yield Gap diferencial.
+
+---
+
+## 3. Fuentes de Datos
+
+| Fuente | Datos | Frecuencia |
+|---|---|---|
+| **Screenermatic** (scraping) | TIR, MD, Convexidad, Paridad de bonos | Diaria (caché DuckDB) |
+| **Yahoo Finance** (yfinance) | Cotizaciones, fundamentales, P/E, ADRs | Tiempo real |
+| **FRED API** | Treasury 10Y, High Yield Spread, VIX | Diaria |
+| **Ámbito Financiero** (API) | EMBI+ Argentina histórico desde 1999 | Diaria (caché DuckDB) |
+| **Docta Capital API** | Fallback para datos de bonos | Semanal (caché DuckDB) |
+
+---
+
+## 4. Limitaciones y Supuestos
+
+- **Muestra mínima:** n ≥ 30 observaciones para todos los tests estadísticos.
+- **Normalidad de retornos:** Validada con Shapiro-Wilk (n<50) o Kolmogorov-Smirnov (n>50). En caso de fallo, se usa distribución empírica no paramétrica.
+- **Riesgo de régimen:** El modelo asume continuidad de la política fiscal y monetaria actual. Un cambio de régimen (p. ej. regreso al cepo, default soberano, cambio de gobierno) requiere recalibración manual.
+- **Screenermatic:** Los datos de bonos dependen de la validez de la sesión PHPSESSID. Si expira, el sistema sirve datos del caché DuckDB (potencialmente desactualizados).
+- **GGAL como proxy del Merval:** Se usa GGAL (ADR NYSE) como proxy del mercado local en dólares por su alta liquidez y correlación con el índice general. No capta activos sin ADR.
+
+---
+
+## 5. Tabla de Procesos
+
+| Proceso | Script | Objetivo | Salida |
+|---|---|---|---|
+| Screener Fama-French | `screener_fundamental.py` | Z-Score de 6 factores | Rankings Excel |
+| Indicadores de Crisis | (interno en allocation) | P(Crisis) sistémica | Señal 0-2 |
+| Divergencia EMBI/Merval | `analizar_divergencia_merval_embi()` | Señal táctica 1 año | ±impacto_rv |
+| Allocation Tres Pilares | `allocation_tres_pilares.py` | Pesos óptimos | `Portfolio_Recommendation.csv` |
+| Descarga EMBI+ histórico | `historico_embi.py` | Serie temporal EMBI | `docta_cache.duckdb` |
+| Scraping bonos | `scraping_screenermatic.py` | Métricas RF | `docta_cache.duckdb` |
+
+---
+
+*Referencias completas disponibles en los docstrings de cada función del código fuente.*
