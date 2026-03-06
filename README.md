@@ -6,9 +6,10 @@ Este repositorio implementa un sistema de inversión "Quantamental" que combina 
 
 *   **Screener Fundamental:** Identifica activos subvaluados y de alta calidad utilizando los factores de Fama-French (Value, Profitability, Investment, Size, Market, Momentum).
 *   **Timing Técnico:** Aplica el indicador de "Túnel Domenec" y fuerza de tendencia para filtrar activos en corrección.
-*   **Optimización de Cartera:** Utiliza el modelo Black-Litterman para asignar pesos óptimos, balanceando la visión de mercado con el equilibrio histórico.
+*   **Gestión de Renta Fija (Milei Regime):** Módulo de scraping y selección de bonos argentinos (LECAPs, CER, Soberanos HD) con análisis de Carry Trade y Riesgo Kuka.
+*   **Optimización de Cartera:** Utiliza el modelo Black-Litterman y un Optimizador Dinámico Cuántico para balancear pesos entre Renta Variable y Renta Fija según el contexto macro.
 *   **Backtesting Engine:** Módulo para simular el rendimiento histórico de la estrategia.
-*   **Integración Local (Argentina):** Capacidad para verificar liquidez en mercados locales (BYMA/Rofex).
+*   **Integración Local (Argentina):** Conexión con Screenermatic y verificación de liquidez en mercados locales (BYMA/Rofex).
 
 ## 📁 Estructura del Proyecto
 
@@ -66,7 +67,14 @@ Simula la estrategia en el pasado para validar su robustez.
 python src/models/backtest_quantamental.py
 ```
 
-### 4. Análisis Técnico Rápido
+### 4. Gestión de Renta Fija (Milei Regime)
+Analiza el universo de bonos de Screenermatic para encontrar oportunidades de Carry Trade o protección soberana.
+```bash
+python src/data/scraping_screenermatic.py
+```
+*   **Lógica:** Calcula Dólar Breakeven y descuenta el "Riesgo Kuka" (~300 bps).
+
+### 5. Análisis Técnico Rápido
 Genera un reporte de indicadores técnicos (Semáforos, ADX, Túneles) sin el análisis fundamental pesado.
 ```bash
 python "src/models/script deteccion momentum domenec.py"

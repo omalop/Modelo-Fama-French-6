@@ -96,17 +96,41 @@ GUÍA DE INTERPRETACIÓN
    - Porcentaje del capital total a asignar a este activo.
    - Calculado para optimizar el retorno ajustado al riesgo.
 
-5. HERRAMIENTA DE SCREENING RÁPIDO (CONTROL)
+6. ASSET ALLOCATION Y RENTA FIJA (NUEVO)
+---------------------------------------
+El sistema ahora incluye un optimizador dinámico que decide el porcentaje de "Renta Variable" vs "Renta Fija" (Liquidez/Resguardo) basado en el régimen económico actual.
+
+A) Configuración de Screenermatic (Scraping):
+   Para obtener datos actualizados de bonos argentinos (TIR, Duration), el sistema utiliza Screenermatic con una sesión autenticada.
+   1. Inicie sesión en https://www.screenermatic.com
+   2. Obtenga el valor de su cookie `PHPSESSID` (F12 en el navegador -> Application -> Cookies).
+   3. Abra su archivo `.env` en la raíz del proyecto.
+   4. Asegúrese de tener las siguientes variables (inyectadas automáticamente si usó el test de login):
+      SCREENERMATIC_PHPSESSID=tu_valor_aqui
+      SCREENERMATIC_VISITOR_ID=tu_valor_aqui
+
+B) Optimización Dinámica (Equity vs Bonds):
+   El script `src/models/optimizador_cartera.py` integra ahora:
+   - Yield Gap Digno: Compara la tasa de ganancias de las acciones (E/P) contra la tasa de descuento local (AL30/AE38).
+   - Dashboard de Crisis: Evalúa Curva 10Y2Y de EEUU, SPREAD High Yield y VIX.
+   - Si detecta riesgo alto, aumenta automáticamente la ponderación en Renta Fija.
+
+C) Selección de Instrumentos de Renta Fija:
+   Cuando el sistema recomienda resguardo, selecciona los mejores bonos basándose en:
+   - Carry Trade: Calcula el Dólar Breakeven a 30 días para LECAPs. Si el dólar esperado es menor al breakeven, sugiere pesos.
+   - Riesgo Kuka: Descuenta la prima de riesgo político para detectar oportunidades genuinas en bonos soberanos Hard Dollar (GD35/GD41).
+
+7. HERRAMIENTA DE SCREENING RÁPIDO (CONTROL)
 --------------------------------------------
 Si desea ver solamente los indicadores técnicos (Semáforos, ADX, Túneles) sin correr todo el modelo matemático:
 
 1. Ejecute el script original mejorado:
    
-   python "script deteccion momentum domenec.py"
+   python "src/models/script deteccion momentum domenec.py"
 
 2. Esto generará un archivo Excel `Screener_Output.xlsx` con pestañas para cada temporalidad (Semanal, Diario, 4H, 1H).
 
-6. SOLUCIÓN DE PROBLEMAS COMUNES
+8. SOLUCIÓN DE PROBLEMAS COMUNES
 --------------------------------
 - "HTTP Error 404":
   Ocurre si la web de Fama-French cambia de estructura. El sistema actual ya incluye un descargador manual robusto. Si persiste, verifique su conexión a internet.
