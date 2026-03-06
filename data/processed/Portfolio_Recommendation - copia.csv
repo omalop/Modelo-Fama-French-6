@@ -1,0 +1,25 @@
+Ticker,Instrumento,Peso_Sugerido,Retorno_Esperado
+VALO.BA,RV_Local,0.1702,1.18
+BHIP.BA,RV_Local,0.1265,0.89
+DGCU2.BA,RV_Local,0.1225,0.86
+BYMA.BA,RV_Local,0.117,0.81
+TGSU2.BA,RV_Local,0.1137,0.78
+HAPV3.SA,RV_Global,0.0241,1.84
+MUFG,RV_Global,0.0234,1.81
+EQNR,RV_Global,0.0148,1.35
+TRV,RV_Global,0.014,1.29
+CL,RV_Global,0.0135,1.26
+AL,RV_Global,0.0131,1.23
+AMGN,RV_Global,0.0122,1.16
+PBR,RV_Global,0.0121,1.15
+MSI,RV_Global,0.0116,1.1
+KB,RV_Global,0.0112,1.07
+S31L6,RF_Local_Pesos (LECAP Jul-26 (ARS)),0.0224,0.3334
+S31G6,RF_Local_Pesos (LECAP Ago-26 (ARS)),0.0224,0.3309
+TZXD6,RF_Local_Pesos (BONCER Dic-26 (CER)),0.0224,0.0534
+TZXD7,RF_Local_Pesos (BONCER Dic-27 (CER)),0.0224,0.076
+TZX28,RF_Local_Pesos (BONCER 2028 (CER)),0.0224,0.0835
+AL30,RF_Local_HD (Soberano HD Ley Arg CP),0.022,0.0925
+AE38,RF_Local_HD (Soberano HD Ley Arg LP),0.022,0.1008
+NDT25,RF_Local_HD (Neuquén (25)),0.022,0.0705
+YFC2O,RF_Local_HD (YPF Corp HD),0.022,0.8523

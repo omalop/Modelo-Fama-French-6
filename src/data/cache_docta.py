@@ -403,7 +403,7 @@ class CacheDoctaAPI:
             "%Y-%m-%d %H:%M:%S"
         )
         resultado = self._conn.execute(
-            "SELECT COUNT(*) FROM docta_api_log WHERE timestamp_utc >= ?",
+            "SELECT COUNT(*) FROM docta_api_log WHERE timestamp_utc >= CAST(? AS TIMESTAMP)",
             [hace_7_dias],
         ).fetchone()
         return resultado[0] if resultado else 0

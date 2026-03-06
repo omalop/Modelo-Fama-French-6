@@ -41,32 +41,21 @@ Pasos:
    - Descargará los factores de riesgo más recientes desde la web de Kenneth French.
    - Alineará las fechas y calculará las sensibilidades (Betas) de cada activo.
    - Calculará el puntaje de Momentum Domenec (0 a 10).
-   - Generará un ranking y seleccionará los mejores candidatos (Top 30).
-   - [NUEVO] Consultará a BYMA (Matba Rofex) por la LIQUIDEZ (Nominales Operados) de estos candidatos.
-   - Ordenará los activos de MAYOR a MENOR liquidez local.
-   - Seleccionará el Top 10 Definitivo.
-
-   IMPORTANTE - CREDENCIALES BYMA/ROFEX:
-   El sistema está configurado por defecto en "Modo Prueba" (Mock) para que funcione sin claves.
-   Para activar la consulta de liquidez REAL:
-   1. Abra el archivo `main.py` con un editor de texto.
-   2. Busque la sección "CONFIGURACION" (líneas ~165).
-   3. Ingrese su Usuario, Password y Cuenta de REMARKETS o PRODUCCIÓN.
-   4. Descomente las líneas del `BymaLiquidityProvider`.
+   - Generará los rankings completos.
+   - Guardará la totalidad de resultados en tablas Excel y mostrará el Top 5 de cada grupo por terminal.
 
 4. SALIDAS Y REPORTES
 ---------------------
 Al finalizar la ejecución, se generarán dos archivos CSV en la misma carpeta:
 
 A) Portfolio_Recommendation.csv
-   - Contiene la cartera final sugerida.
+   - Contiene la cartera final sugerida combinando Renta Variable (Local e Internacional) y Renta Fija.
+   - Determina el porcentaje de cada instrumento según el riesgo macro actual.
    - Columnas clave:
-   - Contiene la cartera final sugerida.
-   - Columnas clave:
+     * Ticker: Símbolo del activo o bono.
+     * Instrumento: Sector o segmento (Soberano, Corporativo, etc.).
      * Peso_Sugerido: Peso sugerido (ej: 0.25 = 25%).
-     * Puntuacion_Final: Puntuación compuesta.
-     * Nominales_Operados: Volumen operado en BYMA (criterio de selección final).
-     * Puntuacion_Momento_Domenec: Puntaje técnico.
+     * Retorno_Esperado: Final Score de FF o TIR en caso de bonos.
 
 B) Full_Ranking_Report.csv
    - Reporte detallado de TODOS los activos analizados.
@@ -90,7 +79,7 @@ GUÍA DE INTERPRETACIÓN
    - 0: El activo es promedio.
    - +2.0: El activo está en el top 2.5% superior (Excelente).
    - -2.0: El activo está en el top 2.5% inferior (Pobre).
-   - Se construye sumando: 50% Momentum + 30% Calidad + 20% Valor.
+   - Se construye sumando los factores Fama-French 6: 25% Valor + 35% Calidad (Profitability) + 20% Inversión + 20% Momentum.
 
 3. Peso_Sugerido:
    - Porcentaje del capital total a asignar a este activo.
