@@ -333,20 +333,90 @@ def calcular_allocation_global(
     }
 
 
-def distribuir_intra_pilar(df_ranking: pd.DataFrame, n: int, peso_total: float) -> pd.DataFrame:
+def seleccionar_por_umbral(
+    df_ranking: pd.DataFrame,
+    peso_total: float,
+    umbral_score: float,
+    min_activos: int = 3,
+    max_activos: int = 15,
+    aplicar_momentum: bool = True
+) -> pd.DataFrame:
     """
-    Distribuye el peso de un pilar entre los primeros N tickers
-    proporcional al Final_Score (siempre positivo usando softmax).
-    """
-    top = df_ranking.head(n).copy()
+    Distribuye el peso de un pilar entre los activos que superan el umbral
+    de FF Score, con filtro de momentum MA52 opcional.
 
-    # Usamos softmax sobre Final_Score para evitar pesos negativos
-    scores = top['Final_Score'].values
+    Fundámento:
+        Grinold & Kahn (1999). 'Active Portfolio Management', Cap. 6.
+        'Ley Fundamental de la Gestión Activa: IR ≈ IC * sqrt(N).'
+        Con IC alto (Fama-French), concentración es óptima.
+        El umbral dinámico evita el error de incluir activos de quality baja.
+
+    Supuesto de momentum:
+        Jegadeesh & Titman (1993). Solo se incluyen activos con precio
+        por encima de la MA52 semanal (tendencia alcista confirmada).
+
+    Args:
+        df_ranking:       DataFrame con columnas ['Ticker', 'Sector', 'Final_Score'].
+        peso_total:       Peso total del pilar a distribuir (0.0 a 1.0).
+        umbral_score:     FF Score mínimo para ser considerado.
+        min_activos:      Mínimo de activos a incluir aunque no pasen el umbral.
+        max_activos:      Máximo de activos a incluir.
+        aplicar_momentum: Si True, aplica filtro MA52 sobre cada ticker.
+
+    Returns:
+        DataFrame con Ticker, Sector, Final_Score, Peso_Total.
+    """
+    if df_ranking.empty:
+        return pd.DataFrame()
+
+    # 1. Filtrar por umbral de calidad
+    df_ok = df_ranking[df_ranking['Final_Score'] >= umbral_score].copy()
+
+    # 2. Si menos activos que el mínimo pasan el umbral, relajar al top-min_activos
+    if len(df_ok) < min_activos:
+        logger.warning(
+            f"Solo {len(df_ok)} activos superan umbral {umbral_score}. "
+            f"Completando hasta {min_activos} (relajando umbral)."
+        )
+        df_ok = df_ranking.head(min_activos).copy()
+
+    # 3. Limitar al máximo
+    df_ok = df_ok.head(max_activos)
+
+    # 4. Filtro de Momentum MA52 (sólo incluir activos en tendencia alcista)
+    if aplicar_momentum and not df_ok.empty:
+        tickers_momentum = []
+        for ticker in df_ok['Ticker'].tolist():
+            try:
+                hist = yf.Ticker(ticker).history(period="1y", interval="1wk")['Close']
+                if len(hist) >= 20:  # mínimo de historia razonable
+                    ma52 = hist.mean()  # media del año (aproximación a MA52w)
+                    precio_actual = hist.iloc[-1]
+                    if precio_actual >= ma52:
+                        tickers_momentum.append(ticker)
+                    else:
+                        logger.info(f"   [Momentum] {ticker} EXCLUIDO: precio {precio_actual:.2f} < MA52 {ma52:.2f}")
+                else:
+                    tickers_momentum.append(ticker)  # sin historia suficiente: incluir
+            except Exception:
+                tickers_momentum.append(ticker)  # error de descarga: incluir
+
+        df_ok = df_ok[df_ok['Ticker'].isin(tickers_momentum)]
+
+        # Si el filtro de momentum elimina todo, volver al mínimo sin filtro
+        if df_ok.empty:
+            logger.warning("Filtro de momentum eliminó todos los activos. Usando top-min sin filtro.")
+            df_ok = df_ranking.head(min_activos).copy()
+
+    # 5. Distribuir capital con softmax sobre FF Score (Grinold & Kahn, 1999)
+    scores = df_ok['Final_Score'].values
     exp_s  = np.exp(scores - scores.max())  # Estabilidad numérica
-    top['Peso_Pilar'] = exp_s / exp_s.sum()
-    top['Peso_Total'] = (top['Peso_Pilar'] * peso_total).round(4)
+    df_ok  = df_ok.copy()
+    df_ok['Peso_Pilar'] = exp_s / exp_s.sum()
+    df_ok['Peso_Total'] = (df_ok['Peso_Pilar'] * peso_total).round(4)
 
-    return top[['Ticker', 'Sector', 'Final_Score', 'Peso_Total']]
+    return df_ok[['Ticker', 'Sector', 'Final_Score', 'Peso_Total']]
+
 
 
 def obtener_yields_bonos(df_bonos: pd.DataFrame) -> dict:
@@ -443,16 +513,40 @@ if __name__ == "__main__":
         df_global_unificado = df_global_unificado.sort_values('Final_Score', ascending=False)
         print(f"   ✅ Global Unificado (SEC+Intl): {len(df_global_unificado)} tickers combinados | Top 10 seleccionados")
 
-    # ── 3. P/E de cada universo ──────────────────────────────────────
-    print("\n📊 [3/5] Calculando Earnings Yield de cada universo...")
-    tickers_arg_top5  = df_arg['Ticker'].head(5).tolist()  if not df_arg.empty  else []
-    tickers_glbl_top10 = df_global_unificado['Ticker'].head(10).tolist() if not df_global_unificado.empty else []
+    # ── 3. Selección dinámica por umbral + P/E de cada universo ────────
+    print("\n📊 [3/5] Selección dinámica por umbral Fama-French + filtro Momentum MA52...")
 
-    pe_arg,    pe_dict_arg    = obtener_pe_ponderado(tickers_arg_top5)
-    pe_global, pe_dict_global = obtener_pe_ponderado(tickers_glbl_top10)
+    # Umbral: 0.30 local (mercado emergente poca liquidez), 0.50 global
+    # Ref: Grinold & Kahn (1999), Evans & Archer (1968), De Groot et al. (2012)
+    UMBRAL_LOCAL  = 0.30
+    UMBRAL_GLOBAL = 0.50
 
-    print(f"   P/E LOCAL  (Top 5 ARG):        {pe_arg:.1f}x  →  E/P: {1/pe_arg:.2%}")
-    print(f"   P/E GLOBAL (Top 10 Unif.):     {pe_global:.1f}x  →  E/P: {1/pe_global:.2%}")
+    # Pre-selección dinámica para calcular P/E representativo
+    df_arg_sel = seleccionar_por_umbral(
+        df_arg, peso_total=alloc_preliminar_rv_local if 'alloc_preliminar_rv_local' in dir() else 0.50,
+        umbral_score=UMBRAL_LOCAL, min_activos=3, max_activos=10,
+        aplicar_momentum=True
+    ) if not df_arg.empty else pd.DataFrame()
+
+    df_global_sel = seleccionar_por_umbral(
+        df_global_unificado, peso_total=alloc_preliminar_rv_global if 'alloc_preliminar_rv_global' in dir() else 0.15,
+        umbral_score=UMBRAL_GLOBAL, min_activos=5, max_activos=15,
+        aplicar_momentum=True
+    ) if not df_global_unificado.empty else pd.DataFrame()
+
+    tickers_arg_dyn   = df_arg_sel['Ticker'].tolist()   if not df_arg_sel.empty   else []
+    tickers_global_dyn = df_global_sel['Ticker'].tolist() if not df_global_sel.empty else []
+
+    n_arg    = len(tickers_arg_dyn)
+    n_global = len(tickers_global_dyn)
+    print(f"   RV Local:  {n_arg} activos seleccionados (umbral FF >= {UMBRAL_LOCAL}, momentum MA52)")
+    print(f"   RV Global: {n_global} activos seleccionados (umbral FF >= {UMBRAL_GLOBAL}, momentum MA52)")
+
+    pe_arg,    pe_dict_arg    = obtener_pe_ponderado(tickers_arg_dyn)
+    pe_global, pe_dict_global = obtener_pe_ponderado(tickers_global_dyn)
+
+    print(f"   P/E LOCAL  ({n_arg} ARG):      {pe_arg:.1f}x  →  E/P: {1/pe_arg:.2%}")
+    print(f"   P/E GLOBAL ({n_global} Unif.): {pe_global:.1f}x  →  E/P: {1/pe_global:.2%}")
 
     # ── 4. Tasa de descuento + Crisis ───────────────────────────────
     print("\n🚦 [4/5] Tasa de descuento + señales de crisis...")
@@ -499,8 +593,12 @@ if __name__ == "__main__":
     print(f"\n{'─'*65}")
     print(f"📈  PILAR 1 — RENTA VARIABLE LOCAL  ({rv_local_pct:.1f}% del capital)")
     print(f"{'─'*65}")
-    if not df_arg.empty and alloc['RV_Local'] > 0:
-        top_arg = distribuir_intra_pilar(df_arg, 5, alloc['RV_Local'])
+    if not df_arg_sel.empty and alloc['RV_Local'] > 0:
+        top_arg = seleccionar_por_umbral(
+            df_arg, peso_total=alloc['RV_Local'],
+            umbral_score=UMBRAL_LOCAL, min_activos=3, max_activos=10,
+            aplicar_momentum=True
+        )
         print(f"  {'Ticker':<10} {'Sector':<25} {'FF Score':>8}  {'% Capital':>10}")
         print(f"  {'-'*60}")
         for _, row in top_arg.iterrows():
@@ -514,8 +612,12 @@ if __name__ == "__main__":
     print(f"\n{'─'*65}")
     print(f"🌎  PILAR 2 — RENTA VARIABLE GLOBAL (UNIFICADO)  ({rv_global_pct:.1f}% del capital)")
     print(f"{'─'*65}")
-    if not df_global_unificado.empty and alloc['RV_Global'] > 0:
-        top_sec = distribuir_intra_pilar(df_global_unificado, 10, alloc['RV_Global'])
+    if not df_global_sel.empty and alloc['RV_Global'] > 0:
+        top_sec = seleccionar_por_umbral(
+            df_global_unificado, peso_total=alloc['RV_Global'],
+            umbral_score=UMBRAL_GLOBAL, min_activos=5, max_activos=15,
+            aplicar_momentum=True
+        )
         print(f"  {'Ticker':<10} {'Sector':<25} {'FF Score':>8}  {'% Capital':>10}")
         print(f"  {'-'*60}")
         for _, row in top_sec.iterrows():
