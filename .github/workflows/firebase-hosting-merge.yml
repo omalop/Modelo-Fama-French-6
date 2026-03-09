@@ -1,17 +1,16 @@
 name: Deploy to Firebase Hosting on merge
 on:
   push:
-      branches:
-            - main
-            jobs:
-              build_and_deploy:
-                  runs-on: ubuntu-latest
-                      steps:
-                            - uses: actions/checkout@v4
-                                  - uses: FirebaseExtended/action-hosting-deploy@v0
-                                          with:
-                                                    repoToken: '${{ secrets.GITHUB_TOKEN }}'
-                                                              firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_MODELO_FAMA_FRENCH_6 }}'
-                                                                        projectId: modelo-fama-french-6
-                                                                                  channelId: live
-                                                                                  
+    branches:
+      - main
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_MODELO_FAMA_FRENCH_6 }}'
+          channelId: live
+          projectId: modelo-fama-french-6
