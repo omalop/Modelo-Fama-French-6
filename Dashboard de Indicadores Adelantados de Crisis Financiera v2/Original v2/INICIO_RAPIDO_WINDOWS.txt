@@ -1,0 +1,174 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║              INICIO RÁPIDO PARA WINDOWS - Crisis Dashboard v7.0              ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🚨 IMPORTANTE: Si ves este error al ejecutar:
+   "ValueError: ERROR CRÍTICO: No se encontró FRED_API_KEY..."
+   
+   ¡NO TE PREOCUPES! Hay 3 soluciones fáciles abajo.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 MÉTODO 1: COPIAR ARCHIVO .env (MÁS FÁCIL - 30 SEGUNDOS)
+═══════════════════════════════════════════════════════════
+
+1. Tienes un archivo llamado "FRED_API_KEY.env" 
+2. Cópialo a la MISMA CARPETA donde está crisis_dashboard_pro.py
+3. ¡Listo! Ejecuta:
+   
+   python crisis_dashboard_pro.py
+
+El programa ahora reconocerá automáticamente tu API key.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 MÉTODO 2: USAR SCRIPT CONFIGURADOR (1 MINUTO)
+═══════════════════════════════════════════════════════════
+
+1. Ejecuta el configurador:
+   
+   python configurar_api_key.py
+
+2. Pega tu API key cuando te la pida: 6c4e4e9a1b4589bc2a0639ce3a5e0fba
+
+3. El script creará el archivo .env automáticamente
+
+4. Ejecuta el dashboard:
+   
+   python crisis_dashboard_pro.py
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 MÉTODO 3: CREAR .env MANUALMENTE (2 MINUTOS)
+═══════════════════════════════════════════════════════════
+
+Paso 1: Abre el Bloc de Notas (Notepad)
+
+Paso 2: Escribe exactamente esto:
+   
+   FRED_API_KEY=6c4e4e9a1b4589bc2a0639ce3a5e0fba
+
+Paso 3: Guarda el archivo como ".env" (CON las comillas) en la misma carpeta
+
+   ⚠️ IMPORTANTE: Asegúrate de:
+   - Guardar como ".env" (incluyendo el punto al inicio)
+   - Tipo de archivo: "Todos los archivos (*.*)"
+   - NO guardarlo como ".env.txt"
+
+Paso 4: Verifica que el archivo se llame exactamente ".env"
+   (Si ves ".env.txt", renómbralo a ".env")
+
+Paso 5: Ejecuta:
+   
+   python crisis_dashboard_pro.py
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📋 MÉTODO 4: VARIABLE DE ENTORNO TEMPORAL (CADA VEZ QUE EJECUTES)
+═══════════════════════════════════════════════════════════════════
+
+Si los otros métodos no funcionan, puedes establecer la clave cada vez:
+
+1. Abre CMD o PowerShell
+
+2. Ejecuta:
+   
+   set FRED_API_KEY=6c4e4e9a1b4589bc2a0639ce3a5e0fba
+
+3. En la MISMA ventana, ejecuta:
+   
+   python crisis_dashboard_pro.py
+
+⚠️ Nota: La clave solo durará mientras tengas esa ventana abierta
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🔧 INSTALACIÓN DE LIBRERÍAS (SI NO LAS TIENES)
+═══════════════════════════════════════════════════════════
+
+Abre CMD o PowerShell y ejecuta:
+
+pip install pandas numpy yfinance fredapi requests beautifulsoup4 openpyxl python-dotenv
+
+⏱️ Esto tomará 2-3 minutos dependiendo de tu conexión.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ VERIFICAR QUE TODO FUNCIONA
+═══════════════════════════════════════════════════════════════════════════════
+
+Una vez que hayas seguido cualquiera de los métodos arriba:
+
+1. Abre CMD o PowerShell
+
+2. Ve a la carpeta del programa:
+   
+   cd "C:\ruta\a\tu\carpeta"
+
+3. Ejecuta:
+   
+   python crisis_dashboard_pro.py
+
+4. Deberías ver:
+   
+   ✅ Cargado FRED_API_KEY.env desde directorio actual
+   (o)
+   ✅ Cargado .env desde directorio actual
+   
+   📊 INICIANDO DASHBOARD DE RIESGO FINANCIERO (V7 - AUDITADO) 📊
+   ...
+
+5. ¡FUNCIONA! Espera 2-3 minutos en la primera ejecución (con backtesting)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🆘 SI NADA DE ESTO FUNCIONA
+═══════════════════════════════════════════════════════════════════════════════
+
+Envíame un screenshot del error COMPLETO que recibes, incluyendo:
+- El comando que ejecutaste
+- El mensaje de error completo
+- El contenido de la carpeta (dir o ls)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+📂 ESTRUCTURA DE ARCHIVOS CORRECTA
+═══════════════════════════════════════════════════════════════════════════════
+
+Tu carpeta debería verse así:
+
+📁 Dashboard de Indicadores Adelantados...
+  ├── 📄 crisis_dashboard_pro.py          ← Script principal
+  ├── 📄 .env                              ← Tu API key (ESTE ARCHIVO ES CLAVE)
+  ├── 📄 FRED_API_KEY.env                  ← O este (cualquiera de los dos)
+  ├── 📄 configurar_api_key.py             ← Script auxiliar (opcional)
+  ├── 📄 INICIO_RAPIDO_WINDOWS.txt         ← Este archivo
+  └── 📁 market_data_cache                 ← Se crea automáticamente
+
+═══════════════════════════════════════════════════════════════════════════════
+
+💡 TIPS IMPORTANTES
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Primera ejecución: 2-3 minutos (hace backtesting)
+✅ Siguientes ejecuciones: 20-30 segundos (usa caché)
+✅ El archivo .env es INVISIBLE en Windows por defecto (es normal)
+✅ El programa funciona OFFLINE después de la primera descarga (12h de caché)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+🎓 SIGUIENTE PASO
+═══════════════════════════════════════════════════════════════════════════════
+
+Una vez que el programa funcione:
+
+1. Lee GUIA_USUARIO.md para entender cada indicador
+2. Lee EJEMPLO_INTERPRETACION.md para ver cómo usarlo
+3. Ejecuta semanalmente (o diario en volatilidad)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+¡Buena suerte con tus inversiones! 📈
+

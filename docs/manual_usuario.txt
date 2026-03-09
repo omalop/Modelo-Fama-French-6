@@ -1,0 +1,132 @@
+MANUAL DE USUARIO - SISTEMA DE INVERSIÓN FAMA-FRENCH + MOMENTUM DOMENEC
+========================================================================
+
+Este documento describe los pasos para configurar, ejecutar e interpretar el sistema de selección de activos.
+
+1. REQUISITOS PREVIOS
+---------------------
+Asegúrese de tener instalado Python (versión 3.9 o superior) y las librerías necesarias.
+Puede instalar las dependencias ejecutando el siguiente comando en la terminal:
+
+    pip install pandas numpy yfinance statsmodels requests openpyxl
+
+2. CONFIGURACIÓN DE ACTIVOS
+---------------------------
+El sistema analiza los activos listados en el archivo "ticker.txt".
+
+- Abra el archivo `ticker.txt`.
+- Ingrese los símbolos (tickers) de los activos que desea analizar.
+- Puede separarlos por comas (AAPL, MSFT, GOOG) o por líneas nuevas.
+- Ejemplo:
+  AAPL
+  MSFT
+  TSLA
+  SPY
+
+3. EJECUCIÓN DEL MODELO PRINCIPAL (FAMA-FRENCH + STRATEGY)
+----------------------------------------------------------
+Este es el motor principal que genera la recomendación de portafolio basándose en:
+- Momentum Jerárquico (Estudio Trimestral -> Decisión Mensual -> Control Semanal).
+- Modelo Fama-French de 6 Factores (Calidad, Valor, Tamaño, etc.).
+- Optimización de Pesos (Black-Litterman).
+
+Pasos:
+1. Abra una terminal en la carpeta del proyecto.
+2. Ejecute el comando:
+   
+   python main.py
+
+3. El sistema realizará lo siguiente automáticamente:
+   - Descargará datos históricos (Mensuales y Semanales) de Yahoo Finance.
+   - Descargará los factores de riesgo más recientes desde la web de Kenneth French.
+   - Alineará las fechas y calculará las sensibilidades (Betas) de cada activo.
+   - Calculará el puntaje de Momentum Domenec (0 a 10).
+   - Generará los rankings completos.
+   - Guardará la totalidad de resultados en tablas Excel y mostrará el Top 5 de cada grupo por terminal.
+
+4. SALIDAS Y REPORTES
+---------------------
+Al finalizar la ejecución, se generarán dos archivos CSV en la misma carpeta:
+
+A) Portfolio_Recommendation.csv
+   - Contiene la cartera final sugerida combinando Renta Variable (Local e Internacional) y Renta Fija.
+   - Determina el porcentaje de cada instrumento según el riesgo macro actual.
+   - Columnas clave:
+     * Ticker: Símbolo del activo o bono.
+     * Instrumento: Sector o segmento (Soberano, Corporativo, etc.).
+     * Peso_Sugerido: Peso sugerido (ej: 0.25 = 25%).
+     * Retorno_Esperado: Final Score de FF o TIR en caso de bonos.
+
+B) Full_Ranking_Report.csv
+   - Reporte detallado de TODOS los activos analizados.
+   - Útil para investigar por qué ciertos activos fueron descartados.
+   - Columnas:
+     * Momento_Bruto: Valor original del momentum.
+     * Calidad_Bruta, Valor_Bruto: Betas calculadas con Fama-French.
+     * Z_Momento, Z_Calidad, Z_Valor: Puntuaciones estandarizadas (Z-Score).
+     * Puntuacion_Final: Suma ponderada de los Z-Scores.
+
+GUÍA DE INTERPRETACIÓN
+----------------------
+1. Puntuacion_Momento_Domenec (0 a 10):
+   - Mide la fuerza de la tendencia.
+   - > 8: Tendencia alcista muy fuerte.
+   - 5 - 8: Tendencia positiva moderada.
+   - < 3: Tendencia bajista o lateral.
+
+2. Puntuacion_Final (Z-Score Compuesto):
+   - Es una medida relativa dentro del universo de activos analizados.
+   - 0: El activo es promedio.
+   - +2.0: El activo está en el top 2.5% superior (Excelente).
+   - -2.0: El activo está en el top 2.5% inferior (Pobre).
+   - Se construye sumando los factores Fama-French 6: 25% Valor + 35% Calidad (Profitability) + 20% Inversión + 20% Momentum.
+
+3. Peso_Sugerido:
+   - Porcentaje del capital total a asignar a este activo.
+   - Calculado para optimizar el retorno ajustado al riesgo.
+
+6. ASSET ALLOCATION Y RENTA FIJA (NUEVO)
+---------------------------------------
+El sistema ahora incluye un optimizador dinámico que decide el porcentaje de "Renta Variable" vs "Renta Fija" (Liquidez/Resguardo) basado en el régimen económico actual.
+
+A) Configuración de Screenermatic (Scraping):
+   Para obtener datos actualizados de bonos argentinos (TIR, Duration), el sistema utiliza Screenermatic con una sesión autenticada.
+   1. Inicie sesión en https://www.screenermatic.com
+   2. Obtenga el valor de su cookie `PHPSESSID` (F12 en el navegador -> Application -> Cookies).
+   3. Abra su archivo `.env` en la raíz del proyecto.
+   4. Asegúrese de tener las siguientes variables (inyectadas automáticamente si usó el test de login):
+      SCREENERMATIC_PHPSESSID=tu_valor_aqui
+      SCREENERMATIC_VISITOR_ID=tu_valor_aqui
+
+B) Optimización Dinámica (Equity vs Bonds):
+   El script `src/models/optimizador_cartera.py` integra ahora:
+   - Yield Gap Digno: Compara la tasa de ganancias de las acciones (E/P) contra la tasa de descuento local (AL30/AE38).
+   - Dashboard de Crisis: Evalúa Curva 10Y2Y de EEUU, SPREAD High Yield y VIX.
+   - Si detecta riesgo alto, aumenta automáticamente la ponderación en Renta Fija.
+
+C) Selección de Instrumentos de Renta Fija:
+   Cuando el sistema recomienda resguardo, selecciona los mejores bonos basándose en:
+   - Carry Trade: Calcula el Dólar Breakeven a 30 días para LECAPs. Si el dólar esperado es menor al breakeven, sugiere pesos.
+   - Riesgo Kuka: Descuenta la prima de riesgo político para detectar oportunidades genuinas en bonos soberanos Hard Dollar (GD35/GD41).
+
+7. HERRAMIENTA DE SCREENING RÁPIDO (CONTROL)
+--------------------------------------------
+Si desea ver solamente los indicadores técnicos (Semáforos, ADX, Túneles) sin correr todo el modelo matemático:
+
+1. Ejecute el script original mejorado:
+   
+   python "src/models/script deteccion momentum domenec.py"
+
+2. Esto generará un archivo Excel `Screener_Output.xlsx` con pestañas para cada temporalidad (Semanal, Diario, 4H, 1H).
+
+8. SOLUCIÓN DE PROBLEMAS COMUNES
+--------------------------------
+- "HTTP Error 404":
+  Ocurre si la web de Fama-French cambia de estructura. El sistema actual ya incluye un descargador manual robusto. Si persiste, verifique su conexión a internet.
+
+- "Insufficient data for scoring":
+  Significa que los activos seleccionados no tienen suficiente historia (menos de 3 años) para calcular las regresiones. Intente añadir activos más antiguos o "Blue Chips".
+
+- Descarga lenta o Timeouts:
+  Si tiene muchos tickers (>400) en `ticker.txt`, Yahoo Finance puede bloquear temporalmente su IP.
+  Solución: Reduzca la lista a lotes de 50 activos o espere unos minutos antes de reintentar.
