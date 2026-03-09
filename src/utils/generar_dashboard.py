@@ -170,6 +170,21 @@ def calcular_rendimiento_multibenchmark(df_cartera: pd.DataFrame) -> dict:
     }
 
 # ── 4. Preparar datos JS ──────────────────────────────────────────────────────
+def obtener_nombres_yf(tickers: list) -> list:
+    nombres = []
+    for t in tickers:
+        t_yf = t if (t.endswith(".BA") or t.endswith(".SA")) else t + ".BA"
+        if "RV_Global" in t: t_yf = t # Patch for global if needed
+        try:
+            info = yf.Ticker(t_yf).info
+            nombre = info.get('shortName') or info.get('longName') or t
+            # Limpiar algunos sufijos comunes de Yahoo
+            nombre = nombre.replace(" S.A.", "").replace(" SA", "").replace(" Inc.", "").split(",")[0].strip()
+            nombres.append(nombre)
+        except:
+            nombres.append(t)
+    return nombres
+
 def preparar_datos_js(df_cartera: pd.DataFrame, df_embi: pd.DataFrame, rend: dict, meta: dict) -> str:
     rv_local  = df_cartera[df_cartera["Instrumento"] == "RV_Local"]
     rv_global = df_cartera[df_cartera["Instrumento"] == "RV_Global"]
@@ -182,8 +197,16 @@ def preparar_datos_js(df_cartera: pd.DataFrame, df_embi: pd.DataFrame, rend: dic
                         round(rv_global["Peso_Sugerido"].sum()*100,1), 
                         round(rf_rows["Peso_Sugerido"].sum()*100,1)]
         },
-        "rv_local": { "tickers": rv_local["Ticker"].tolist(), "pesos": (rv_local["Peso_Sugerido"] * 100).round(1).tolist() },
-        "rv_global": { "tickers": rv_global["Ticker"].tolist(), "pesos": (rv_global["Peso_Sugerido"] * 100).round(1).tolist() },
+        "rv_local": { 
+            "tickers": rv_local["Ticker"].tolist(), 
+            "nombres": obtener_nombres_yf(rv_local["Ticker"].tolist()),
+            "pesos": (rv_local["Peso_Sugerido"] * 100).round(1).tolist() 
+        },
+        "rv_global": { 
+            "tickers": rv_global["Ticker"].tolist(), 
+            "nombres": obtener_nombres_yf(rv_global["Ticker"].tolist()),
+            "pesos": (rv_global["Peso_Sugerido"] * 100).round(1).tolist() 
+        },
         "rf_items": rf_rows.to_dict("records"),
         "embi": { "fechas": df_embi["fecha"].tolist(), "valores": df_embi["embi_puntos"].tolist() },
         "rend": rend,
@@ -432,10 +455,12 @@ new Chart(document.getElementById('chartMain'), {{
 
 const tbodyRV = document.getElementById('tbodyRV');
 D.rv_global.tickers.forEach((t, i) => {{
-    tbodyRV.innerHTML += `<tr class="hover:bg-slate-800/20"><td class="px-6 py-4 font-bold text-primary">${{t}}</td><td class="px-6 py-4 text-slate-400">Global CEDEAR</td><td class="px-6 py-4 font-bold">${{D.rv_global.pesos[i]}}%</td></tr>`;
+    let n = D.rv_global.nombres[i];
+    tbodyRV.innerHTML += `<tr class="hover:bg-slate-800/20"><td class="px-6 py-4"><span class="font-bold text-primary block">${{n}}</span><span class="text-xs text-slate-500">${{t}}</span></td><td class="px-6 py-4 text-slate-400">Global CEDEAR</td><td class="px-6 py-4 font-bold">${{D.rv_global.pesos[i]}}%</td></tr>`;
 }});
 D.rv_local.tickers.forEach((t, i) => {{
-    tbodyRV.innerHTML += `<tr class="hover:bg-slate-800/20"><td class="px-6 py-4 font-bold text-emerald-500">${{t}}</td><td class="px-6 py-4 text-slate-400">Local Merval</td><td class="px-6 py-4 font-bold">${{D.rv_local.pesos[i]}}%</td></tr>`;
+    let n = D.rv_local.nombres[i];
+    tbodyRV.innerHTML += `<tr class="hover:bg-slate-800/20"><td class="px-6 py-4"><span class="font-bold text-emerald-500 block">${{n}}</span><span class="text-xs text-slate-500">${{t}}</span></td><td class="px-6 py-4 text-slate-400">Local Merval</td><td class="px-6 py-4 font-bold">${{D.rv_local.pesos[i]}}%</td></tr>`;
 }});
 
 const tbodyRF = document.getElementById('tbodyRF');
