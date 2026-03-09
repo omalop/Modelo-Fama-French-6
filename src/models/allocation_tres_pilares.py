@@ -78,6 +78,10 @@ BONOS_PESOS_CER     = {"S31L6": "LECAP Jul-26 (ARS)",
                        "TZXD7": "BONCER Dic-27 (CER)",
                        "TZX28": "BONCER 2028 (CER)"}
 
+# PHPSESSID actualizado para Screenermatic (renovar cuando expire)
+# Actualizado: 2026-03-09
+_PHPSESSID_ACTUAL = "89a157e4f517dfdfa789c64cc6ce858b"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. FUNCIONES AUXILIARES
@@ -422,8 +426,15 @@ def seleccionar_por_umbral(
 def obtener_yields_bonos(df_bonos: pd.DataFrame) -> dict:
     """
     Extrae TIR, Modified Duration, Convexidad, y Paridad desde el DataFrame
-    de Screenermatic para los 3 segmentos de RF.
-    Retorna dict {ticker: {'desc': str, 'segmento': str, 'tir': float, 'md': float, 'cvx': float, 'paridad': float}}
+    de Screenermatic para los 4 segmentos de RF.
+
+    Retorna:
+        dict {ticker: {'desc': str, 'segmento': str, 'tir': float,
+                       'md': float, 'cvx': float, 'paridad': float,
+                       'tem': float}}
+
+    Referencia Duration y Convexidad:
+        Fabozzi, F. J. (2007). "Fixed Income Mathematics". McGraw-Hill, Cap. 4-5.
     """
     todos = {}
     for ticker, desc in BONOS_SOBERANOS.items():
@@ -439,17 +450,59 @@ def obtener_yields_bonos(df_bonos: pd.DataFrame) -> dict:
         fila = df_bonos[df_bonos['simbolo'] == ticker]
         if not fila.empty:
             tir = fila.iloc[0].get('tir_pct')
-            todos[ticker]['tir'] = tir / 100.0 if pd.notna(tir) else None
+            tir_decimal = tir / 100.0 if pd.notna(tir) else None
+            todos[ticker]['tir'] = tir_decimal
             todos[ticker]['md'] = fila.iloc[0].get('modified_dur')
             todos[ticker]['cvx'] = fila.iloc[0].get('convexidad')
             todos[ticker]['paridad'] = fila.iloc[0].get('paridad_pct')
+            # TEM: Tasa Efectiva Mensual = (1 + TIR_anual)^(1/12) - 1
+            todos[ticker]['tem'] = (1 + tir_decimal) ** (1/12) - 1 if tir_decimal is not None else None
         else:
-            todos[ticker]['tir'] = None
-            todos[ticker]['md'] = None
-            todos[ticker]['cvx'] = None
+            todos[ticker]['tir']   = None
+            todos[ticker]['md']    = None
+            todos[ticker]['cvx']   = None
             todos[ticker]['paridad'] = None
+            todos[ticker]['tem']   = None
 
     return todos
+
+
+def _calcular_tir_minima_hd(df_embi: pd.DataFrame) -> float:
+    """
+    Calcula la TIR mínima aceptable para bonos Hard Dollar soberanos/subsoberanos.
+
+    Fórmula dinámica:
+        TIR_min = Yield_Treasury_10Y + (EMBI/10000) +/- tolerancia (1%)
+
+    Supuestos:
+        - El Yield del Treasury 10Y se obtiene del símbolo '^TNX' de yfinance.
+        - El EMBI es el último dato del DataFrame (puntos básicos).
+        - La tolerancia del ±1% representa el rango de aceptación implícito del mercado.
+
+    Referencia:
+        Emerging Markets Bond Index Plus (EMBI+) — J.P. Morgan (1999).
+        Guideline: TIR_bono >= RF_libre_riesgo + Spread_pais
+
+    Returns:
+        float con la TIR mínima anualizada como decimal (ej: 0.0875 = 8.75%).
+    """
+    try:
+        tnx_data = yf.Ticker("^TNX").history(period="5d")
+        treasury_yield = tnx_data['Close'].iloc[-1] / 100 if not tnx_data.empty else 0.043
+    except Exception:
+        treasury_yield = 0.043  # 4.3% fallback
+
+    embi_puntos = df_embi['embi_puntos'].iloc[-1] if not df_embi.empty else 600
+    embi_decimal = embi_puntos / 10000.0
+
+    tir_minima = treasury_yield + embi_decimal - 0.01  # -1% de tolerancia
+    tir_maxima = treasury_yield + embi_decimal + 0.01  # +1% de tolerancia
+
+    logger.info(
+        f"Treasury 10Y: {treasury_yield:.2%} | EMBI+: {embi_puntos:.0f} pts | "
+        f"TIR HD mínima: {tir_minima:.2%} | máxima: {tir_maxima:.2%}"
+    )
+    return tir_minima, tir_maxima, treasury_yield, embi_puntos
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -633,47 +686,123 @@ if __name__ == "__main__":
     print(f"{'─'*65}")
     yields_bonos = obtener_yields_bonos(df_bonos)
 
+    # Calcular TIR mínima dinámica para Hard Dollar
+    tir_hd_min, tir_hd_max, treasury_10y, embi_actual = _calcular_tir_minima_hd(df_embi)
+    print(f"  📡  Treasury 10Y: {treasury_10y:.2%}  |  EMBI+: {embi_actual:.0f} pts")
+    print(f"  📏  TIR HD mínima aceptable: {tir_hd_min:.2%} (±1% tolerancia)")
+
+    # Input de inflación esperada para bonos en pesos
+    try:
+        inflacion_mensual_esperada_str = input(
+            "  📊  Ingrese la inflación mensual esperada para pesos (ej: 2.5 para 2.5%): "
+        ).strip()
+        inflacion_mensual_esperada = float(inflacion_mensual_esperada_str) / 100.0
+    except (ValueError, EOFError):
+        inflacion_mensual_esperada = 0.025  # Default: 2.5% mensual
+        print(f"  ⚠️  Usando inflación por defecto: {inflacion_mensual_esperada:.1%} mensual")
+
     # Agrupar por segmento y guardar bonos viables para sugerencia
     bonos_viables_hd = []
     bonos_viables_pesos = []
+
+    # Recopilar TEM de pesos para calcular promedio luego
+    tem_pesos_list = []
+    for tk, info in yields_bonos.items():
+        if info['segmento'] == 'Pesos/CER' and info.get('tem') is not None:
+            tem_pesos_list.append(info['tem'])
+    tem_promedio_mercado = sum(tem_pesos_list) / len(tem_pesos_list) if tem_pesos_list else inflacion_mensual_esperada
+
     for segmento in ['Soberano', 'Subsoberano', 'Corporativo', 'Pesos/CER']:
         print(f"  [{segmento.upper()}]")
+        bonos_segmento = []
         for ticker, info in yields_bonos.items():
             if info['segmento'] != segmento:
                 continue
             tir = info['tir']
             if tir is not None:
-                paridad = info.get('paridad') or 0
-                cvx = info.get('cvx') or 0
-                md = info.get('md') or 0
-                
-                # Criterios dinámicos según el segmento/moneda
-                if segmento == 'Pesos/CER':
-                    # TIR real positiva o nominal atractiva, paridad no tan restringida (<110)
-                    es_viable = tir >= 0.02 and md < 5 and paridad < 110
-                else:
-                    # Riesgo Hard Dollar standard
-                    es_viable = tir >= 0.07 and md < 5 and paridad < 100
+                paridad = info.get('paridad') or 0.0
+                cvx     = info.get('cvx') or 0.0
+                md      = info.get('md') or 0.0
+                tem     = info.get('tem')
+
+                if segmento in ('Soberano', 'Subsoberano'):
+                    # ----------------------------------------------------
+                    # Soberanos / Subsoberanos HD:
+                    # - Sin límite de paridad
+                    # - TIR mínima dinámica: Treasury + EMBI - 1% (tolerancia)
+                    # - Horizonte Milei (~6 años): usar filtros de Convexidad alta y MD razonable
+                    #   para maximizar upside ante baja riesgo país y minimizar caída si sube
+                    # Referencia: Fabozzi (2007) Cap. 7 — Convexidad positiva como seguro de tasa
+                    # ----------------------------------------------------
+                    es_viable = (tir >= tir_hd_min) and (cvx > 0) and (md <= 10)
+                    etiqueta_paridad = "-"  # Sin restricción de paridad en soberanos
+
+                elif segmento == 'Corporativo':
+                    # ----------------------------------------------------
+                    # Corporativos HD:
+                    # - Paridad: 90% ≤ paridad ≤ 100.9% (refleja calidad crediticia)
+                    # - Criterio compuesto: TIR + Convexidad + MD
+                    #   Mayor TIR = mercado confía en la empresa
+                    #   Mayor CVX = mayor upside ante calda de tasas
+                    #   Menor MD = menor castigo ante suba de riesgo país
+                    # ----------------------------------------------------
+                    paridad_ok = (90.0 <= paridad <= 100.9)
+                    es_viable = paridad_ok and (tir >= tir_hd_min) and (cvx >= 0) and (md <= 7)
+                    etiqueta_paridad = f"{paridad:.1f}%"
+
+                else:  # Pesos/CER
+                    # ----------------------------------------------------
+                    # Bonos en Pesos (Carry Trade / CER):
+                    # - TEM debe superar la inflación mensual esperada
+                    # - TEM debe superar el promedio del mercado de bonos pesos
+                    # - MD < 5 (sensibilidad manejable)
+                    # Referencia: Carry Trade — Brunnermeier et al. (2008)
+                    # ----------------------------------------------------
+                    tem_ok = (tem is not None) and (tem > max(inflacion_mensual_esperada, tem_promedio_mercado))
+                    es_viable = tem_ok and (md < 5)
+                    etiqueta_paridad = f"{paridad:.1f}%" if paridad else "-"
 
                 marca = "⭐" if es_viable else "  "
-                
-                print(f"  {marca}  {ticker:<8} {info['desc']:<30}  TIR: {tir:.2%}  |  MD: {md:.2f}  |  CVX: {cvx:.2f}  |  Paridad: {paridad:.1f}%")
-                
+
+                # Línea de display con TEM para pesos/CER
+                if segmento == 'Pesos/CER' and tem is not None:
+                    print(f"  {marca}  {ticker:<8} {info['desc']:<28}  TIR:{tir:.2%} TEM:{tem:.2%}  MD:{md:.2f}  CVX:{cvx:.2f}  Par:{etiqueta_paridad}")
+                else:
+                    print(f"  {marca}  {ticker:<8} {info['desc']:<28}  TIR:{tir:.2%}  MD:{md:.2f}  CVX:{cvx:.2f}  Par:{etiqueta_paridad}")
+
                 if es_viable:
-                    b_dict = {
-                        'Ticker': ticker,
-                        'Desc': info['desc'],
-                        'TIR': tir
-                    }
+                    b_dict = {'Ticker': ticker, 'Desc': info['desc'], 'TIR': tir,
+                              'MD': md, 'CVX': cvx, 'TEM': tem}
+                    bonos_segmento.append(b_dict)
                     if segmento == 'Pesos/CER':
                         bonos_viables_pesos.append(b_dict)
                     else:
                         bonos_viables_hd.append(b_dict)
             else:
                 print(f"       {ticker:<8} {info['desc']:<30}  Sin datos hoy")
+
+        # Ranking compuesto para HD dentro de cada segmento
+        if bonos_segmento and segmento != 'Pesos/CER':
+            # Score compuesto: balancear TIR (1pt), CVX (1pt) e inversa MD (1pt)
+            # Normalizar CVX e inversa de MD sobre el propio segmento
+            df_seg = pd.DataFrame(bonos_segmento)
+            if len(df_seg) > 1:
+                df_seg['score_compuesto'] = (
+                    (df_seg['TIR'] / df_seg['TIR'].max() if df_seg['TIR'].max() > 0 else 0) +
+                    (df_seg['CVX'] / df_seg['CVX'].max() if df_seg['CVX'].max() > 0 else 0) +
+                    ((1 / df_seg['MD'].replace(0, np.nan)) / (1 / df_seg['MD'].replace(0, np.nan)).max())
+                )
+                df_seg = df_seg.sort_values('score_compuesto', ascending=False)
+                print(f"  ↳ Ranking {segmento}: {' > '.join(df_seg['Ticker'].tolist())}")
         print()
 
-    # Distribución Dinámica por Riesgo Político
+    # Pesos en pesos: ranking por TEM descendente
+    if bonos_viables_pesos:
+        bonos_viables_pesos.sort(key=lambda x: x.get('TEM') or 0, reverse=True)
+        print(f"  ↳ Ranking Pesos/CER por TEM: {' > '.join(b['Ticker'] for b in bonos_viables_pesos)}")
+        print(f"  📊  TEM promedio mercado: {tem_promedio_mercado:.2%}  |  Inflación esperada: {inflacion_mensual_esperada:.2%}")
+
+    # Distribución Dinámica por Riesgo Político (imagen presidencial)
     peso_rel_pesos = max(0.1, min(0.9, confianza_gobierno / 100.0))
     peso_rel_hd = 1.0 - peso_rel_pesos
     
@@ -686,8 +815,8 @@ if __name__ == "__main__":
     peso_rf_hd = alloc['RF_Local'] * peso_rel_hd
     
     print(f"  ⚖️  Ajuste por Imagen Presidencial ({confianza_gobierno}%):")
-    print(f"      → Ponderación Renta Fija: {peso_rel_pesos*100:.1f}% Pesos/CER | {peso_rel_hd*100:.1f}% Hard Dollar\n")
-
+    print(f"      → Ponderación Renta Fija: {peso_rel_pesos*100:.1f}% Pesos/CER | {peso_rel_hd*100:.1f}% Hard Dollar")
+    print(f"      → Horizonte estratégico: ~6 años (gobierno Milei). Revisar si hay cambio político.")
     print(f"  ℹ️  Estrategia: Buy & Hold. Revisar mensualmente.")
     print(f"  ℹ️  Los GD (ley NY) se sugieren SOLO si spread vs AL > 30 bps.")
 
@@ -762,4 +891,107 @@ if __name__ == "__main__":
     print(f"  {'-'*42}")
     total_check = (alloc['RV_Local'] + alloc['RV_Global'] + alloc['RF_Local']) * 100
     print(f"  {'TOTAL':30} {total_check:>9.1f}%")
+    print(f"{SEP}")
+
+    # ─── BENCHMARKS Y MÉTRICAS DE CARTERA ────────────────────────────
+    print(f"\n{SEP}")
+    print("📈  BENCHMARKS Y MÉTRICAS DE CARTERA")
+    print(f"{SEP}")
+
+    # SPX (S&P 500 en USD — no se ajusta a CCL, es el índice base en dólares)
+    try:
+        spy_hist = yf.Ticker("^GSPC").history(period="1y")
+        spx_1a = (spy_hist['Close'].iloc[-1] / spy_hist['Close'].iloc[0] - 1) if not spy_hist.empty else None
+        spx_mtd = (spy_hist['Close'].iloc[-1] / spy_hist['Close'].iloc[-22] - 1) if len(spy_hist) > 22 else None
+        print(f"  🌎  S&P 500 (USD):      {spx_1a:+.2%} (1A)  |  {spx_mtd:+.2%} (MTD)" if spx_1a else "  🌎  S&P 500: Sin datos")
+    except Exception:
+        print("  🌎  S&P 500: Sin datos")
+
+    # Merval en CCL (Merval ARS / CCL)
+    try:
+        from src.models.screener_fundamental import obtener_serie_ccl
+        merval_hist = yf.Ticker("^MERV").history(period="1y")
+        ccl_serie = obtener_serie_ccl()
+        if not merval_hist.empty and not ccl_serie.empty:
+            merv_close = merval_hist['Close'].copy()
+            merv_close.index = pd.to_datetime(merv_close.index).normalize().tz_localize(None)
+            ccl_serie.index = pd.to_datetime(ccl_serie.index).normalize().tz_localize(None)
+            df_bm = pd.concat([merv_close.rename("merv"), ccl_serie.rename("ccl")], axis=1).dropna()
+            merval_ccl = df_bm["merv"] / df_bm["ccl"]
+            merval_1a = (merval_ccl.iloc[-1] / merval_ccl.iloc[0] - 1)
+            merval_mtd = (merval_ccl.iloc[-1] / merval_ccl.iloc[-22] - 1) if len(merval_ccl) > 22 else None
+            print(f"  🇦🇷  Merval (CCL-USD): {merval_1a:+.2%} (1A)  |  {merval_mtd:+.2%} (MTD)" if merval_mtd else f"  🇦🇷  Merval CCL: {merval_1a:+.2%} (1A)")
+        else:
+            print("  🇦🇷  Merval CCL: Sin datos")
+    except Exception as e:
+        print(f"  🇦🇷  Merval CCL: Sin datos ({e})")
+
+    # Beta de la Cartera (ponderada por peso de cada activo)
+    try:
+        tickers_rv = []
+        pesos_rv = []
+        if not df_arg.empty and alloc['RV_Local'] > 0:
+            for _, row in top_arg.iterrows():
+                tickers_rv.append(row['Ticker'])
+                pesos_rv.append(row['Peso_Total'])
+        if not df_global_unificado.empty and alloc['RV_Global'] > 0:
+            for _, row in top_sec.iterrows():
+                tickers_rv.append(row['Ticker'])
+                pesos_rv.append(row['Peso_Total'])
+
+        if tickers_rv:
+            spy_ret = yf.download("^GSPC", period="1y", progress=False)
+            if isinstance(spy_ret.columns, pd.MultiIndex):
+                spy_ret = spy_ret.xs('Close', level='Price', axis=1).squeeze()
+            else:
+                spy_ret = spy_ret['Close']
+            spy_ret = spy_ret.pct_change().dropna()
+
+            betas_activos = []
+            for ticker in tickers_rv:
+                try:
+                    hist_t = yf.download(ticker, period="1y", progress=False)
+                    if isinstance(hist_t.columns, pd.MultiIndex):
+                        hist_t = hist_t.xs('Close', level='Price', axis=1).squeeze()
+                    else:
+                        hist_t = hist_t['Close']
+                    ret_t = hist_t.pct_change().dropna()
+                    from src.models.screener_fundamental import calcular_beta
+                    b = calcular_beta(ret_t, spy_ret, min_obs=30)
+                    betas_activos.append(b if not np.isnan(b) else 1.0)
+                except Exception:
+                    betas_activos.append(1.0)
+
+            beta_cartera = sum(p * b for p, b in zip(pesos_rv, betas_activos)) / sum(pesos_rv)
+            print(f"  ⚡  Beta Cartera vs SPY:  {beta_cartera:.3f}")
+        else:
+            print("  ⚡  Beta Cartera: Sin activos de RV seleccionados")
+    except Exception as e:
+        print(f"  ⚡  Beta Cartera: Error ({e})")
+
+    # Max Drawdown de la cartera (basado en retornos históricos ponderados)
+    try:
+        if tickers_rv and pesos_rv:
+            retornos_df = pd.DataFrame()
+            for ticker, peso in zip(tickers_rv, pesos_rv):
+                try:
+                    hist_t = yf.download(ticker, period="1y", progress=False)
+                    if isinstance(hist_t.columns, pd.MultiIndex):
+                        close_t = hist_t.xs('Close', level='Price', axis=1).squeeze()
+                    else:
+                        close_t = hist_t['Close']
+                    retornos_df[ticker] = close_t.pct_change().fillna(0) * peso
+                except Exception:
+                    pass
+
+            if not retornos_df.empty:
+                retorno_cartera_dia = retornos_df.sum(axis=1)
+                nav = (1 + retorno_cartera_dia).cumprod()
+                max_nav = nav.cummax()
+                drawdown = (nav - max_nav) / max_nav
+                max_dd = drawdown.min()
+                print(f"  📉  Max Drawdown (1A):   {max_dd:.2%}")
+    except Exception as e:
+        print(f"  📉  Max Drawdown: Error ({e})")
+
     print(f"{SEP}\n")

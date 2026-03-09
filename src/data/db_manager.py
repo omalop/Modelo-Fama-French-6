@@ -209,18 +209,41 @@ class DBManager:
                         
                         if df_batch.empty: continue
 
-                        # Vectorización: Transformar MultiIndex a Long format directamente
+                        # Vectorización: Transformar MultiIndex a Long format
+                        # La versión actual de yfinance SIEMPRE devuelve MultiIndex con
+                        # niveles ['Ticker', 'Price']. Usamos stack en el nivel 'Ticker'.
                         if isinstance(df_batch.columns, pd.MultiIndex):
-                            # Stack nivel 0 (tickers)
-                            df_long = df_batch.stack(level=0, future_stack=True).reset_index()
+                            # Identificar el nivel que contiene los tickers
+                            # yfinance: nivel 0='Price', nivel 1 podría ser el ticker o viceversa
+                            ticker_level = None
+                            for lvl_idx, lvl_name in enumerate(df_batch.columns.names):
+                                if lvl_name == 'Ticker':
+                                    ticker_level = lvl_idx
+                                    break
                             
-                            # yfinance y pandas devolvieron la columna como 'Ticker' o 'level_1', contemplamos ambas
-                            df_long.rename(columns={
-                                'level_1': 'ticker', 'Ticker': 'ticker', 'Date': 'date', 'Open': 'open',
-                                'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'
-                            }, inplace=True)
+                            if ticker_level is None:
+                                # Fallback: asumir que el nivel con más valores únicos es Ticker
+                                ticker_level = 0 if len(df_batch.columns.get_level_values(0).unique()) > len(df_batch.columns.get_level_values(1).unique()) else 1
+                            
+                            # Stackear el nivel opuesto al 'Ticker' para obtener columnas OHLCV
+                            price_level = 1 - ticker_level  # 0 o 1
+                            df_long = df_batch.stack(level=ticker_level).reset_index()
+                            
+                            # Renombrar columnas estándar
+                            rename_map = {
+                                'Date': 'date', 'Ticker': 'ticker',
+                                'Open': 'open', 'High': 'high', 'Low': 'low',
+                                'Close': 'close', 'Volume': 'volume'
+                            }
+                            df_long.rename(columns=rename_map, inplace=True)
+                            # Renombrar posibles variaciones de nombre de ticker
+                            if 'ticker' not in df_long.columns:
+                                for alt in ['Ticker', 'level_1', 'level_0']:
+                                    if alt in df_long.columns:
+                                        df_long.rename(columns={alt: 'ticker'}, inplace=True)
+                                        break
                         else:
-                            # Un solo ticker
+                            # Caso inexistente en yfinance moderno, pero por robustez:
                             df_long = df_batch.reset_index()
                             df_long['ticker'] = batch[0]
                             df_long.rename(columns={
