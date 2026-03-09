@@ -1003,6 +1003,7 @@ if __name__ == "__main__":
                 pesos_rv.append(row['Peso_Total'])
 
         if tickers_rv:
+            # 1. Beta vs SPY (Benchmark Global)
             spy_ret = yf.download("^GSPC", period="1y", progress=False)
             if isinstance(spy_ret.columns, pd.MultiIndex):
                 spy_ret = spy_ret.xs('Close', level='Price', axis=1).squeeze()
@@ -1010,7 +1011,31 @@ if __name__ == "__main__":
                 spy_ret = spy_ret['Close']
             spy_ret = spy_ret.pct_change().dropna()
 
-            betas_activos = []
+            # 2. Beta vs Merval CCL (Benchmark Local en USD)
+            from src.models.screener_fundamental import obtener_serie_ccl, calcular_beta
+            try:
+                merval_ars = yf.download("^MERV", period="1y", progress=False)
+                if isinstance(merval_ars.columns, pd.MultiIndex):
+                    merval_ars = merval_ars.xs('Close', level='Price', axis=1).squeeze()
+                else:
+                    merval_ars = merval_ars['Close']
+                ccl = obtener_serie_ccl()
+                if not merval_ars.empty and not ccl.empty:
+                    merval_ars.index = pd.to_datetime(merval_ars.index).normalize().tz_localize(None)
+                    ccl.index = pd.to_datetime(ccl.index).normalize().tz_localize(None)
+                    common_merv = merval_ars.index.intersection(ccl.index)
+                    merval_usd = merval_ars.loc[common_merv] / ccl.loc[common_merv]
+                    merv_usd_ret = merval_usd.pct_change().dropna()
+                else:
+                    merv_usd_ret = None
+            except Exception:
+                merv_usd_ret = None
+
+            betas_spy = []
+            betas_merv = []
+            
+            # Descargar historicos una sola vez para eficiencia
+            print(f"  ⚡  Calculando Betas duales para {len(tickers_rv)} activos...")
             for ticker in tickers_rv:
                 try:
                     hist_t = yf.download(ticker, period="1y", progress=False)
@@ -1019,15 +1044,29 @@ if __name__ == "__main__":
                     else:
                         hist_t = hist_t['Close']
                     ret_t = hist_t.pct_change().dropna()
-                    from src.models.screener_fundamental import calcular_beta
-                    b = calcular_beta(ret_t, spy_ret, min_obs=30)
-                    betas_activos.append(b if not np.isnan(b) else 1.0)
+                    
+                    # Beta SPY
+                    b_spy = calcular_beta(ret_t, spy_ret, min_obs=30)
+                    betas_spy.append(b_spy if not np.isnan(b_spy) else 1.0)
+                    
+                    # Beta Merval (si el benchmark local esta disponible)
+                    if merv_usd_ret is not None:
+                        b_merv = calcular_beta(ret_t, merv_usd_ret, min_obs=30)
+                        betas_merv.append(b_merv if not np.isnan(b_merv) else 1.0)
+                    else:
+                        betas_merv.append(1.0)
                 except Exception:
-                    betas_activos.append(1.0)
+                    betas_spy.append(1.0)
+                    betas_merv.append(1.0)
 
-            beta_cartera = sum(p * b for p, b in zip(pesos_rv, betas_activos)) / sum(pesos_rv)
-            print(f"  ⚡  Beta Cartera vs SPY:  {beta_cartera:.3f}")
+            beta_cartera_spy = sum(p * b for p, b in zip(pesos_rv, betas_spy)) / sum(pesos_rv)
+            beta_cartera_merv = sum(p * b for p, b in zip(pesos_rv, betas_merv)) / sum(pesos_rv)
+            
+            print(f"  ⚡  Beta Cartera vs SPY (Global):    {beta_cartera_spy:.3f}")
+            print(f"  ⚡  Beta Cartera vs Merval (Local):  {beta_cartera_merv:.3f}")
         else:
+            beta_cartera_spy = 1.0
+            beta_cartera_merv = 1.0
             print("  ⚡  Beta Cartera: Sin activos de RV seleccionados")
     except Exception as e:
         print(f"  ⚡  Beta Cartera: Error ({e})")
@@ -1077,14 +1116,17 @@ if __name__ == "__main__":
                 drawdown = (nav - max_nav) / max_nav
                 max_dd = drawdown.min()
                 
+                # CAGR = (1 + ret_total) ^ (252 / n_dias) - 1
+                n_dias = len(retorno_cartera_dia)
+                cagr_val = ((1 + ret_total_cartera) ** (252.0 / n_dias)) - 1 if n_dias > 0 else 0
+
                 print(f"  ⚡  Volatilidad (1A):     {vol_anual:.2%}")
+                print(f"  ⚡  CAGR (Anualizado):    {cagr_val:.2%}")
                 print(f"  ⚡  Sharpe Ratio:         {sharpe_cartera:.2f}")
                 print(f"  📉  Max Drawdown (1A):   {max_dd:.2%}")
     except Exception as e:
         print(f"  📉  Métricas de Riesgo: Error ({e})")
 
-    # --- EXPORTAR METADATOS PARA DASHBOARD ---
-    import json
     # --- EXPORTAR METADATOS PARA DASHBOARD ---
     import json
     metadata = {
@@ -1095,8 +1137,10 @@ if __name__ == "__main__":
         "signals_crisis": signals,
         "prob_crisis": prob_c,
         "divergencia": divergencia,
-        "beta_cartera": round(beta_cartera, 3) if 'beta_cartera' in locals() else 0,
+        "beta_cartera_spy": round(beta_cartera_spy, 3) if 'beta_cartera_spy' in locals() else 0,
+        "beta_cartera_merv": round(beta_cartera_merv, 3) if 'beta_cartera_merv' in locals() else 0,
         "vol_anual": round(vol_anual, 4),
+        "cagr_cartera": round(cagr_val, 4) if 'cagr_val' in locals() else 0,
         "sharpe_cartera": round(sharpe_cartera, 2),
         "max_dd_1a": round(max_dd, 4),
         "fecha_run": datetime.now().strftime("%d/%m/%Y %H:%M")
