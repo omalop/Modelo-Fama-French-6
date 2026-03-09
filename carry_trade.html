@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Fixed Income &amp; Carry Suite</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1e94f6",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0B0E11",
+                        "success": "#10b981",
+                        "danger": "#ef4444",
+                        "accent-blue": "#1e94f6",
+                        "card-dark": "#161b22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body { font-family: 'Inter', sans-serif; }
+        .glass-panel {
+            background: rgba(22, 27, 34, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glow-blue { box-shadow: 0 0 15px rgba(30, 148, 246, 0.3); }
+        .glow-green { box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }.nav-item-active {
+            @apply bg-primary/15 text-primary border-r-2 border-primary;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 antialiased overflow-hidden h-screen flex">
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col h-full bg-background-light dark:bg-card-dark">
+<div class="p-6 flex items-center gap-3">
+<div class="size-10 rounded-lg bg-primary flex items-center justify-center text-white">
+<span class="material-symbols-outlined">query_stats</span>
+</div>
+<div>
+<h1 class="font-bold text-sm tracking-tight">FIXED INCOME</h1>
+<p class="text-[10px] text-slate-500 uppercase font-semibold">Carry Suite Pro</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-1 mt-4">
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-xl">monitoring</span>
+<span class="text-sm font-medium">Monitor de Curvas</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg nav-item-active cursor-pointer group">
+<span class="material-symbols-outlined text-xl fill-1">currency_exchange</span>
+<span class="text-sm font-bold">Carry Trade</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined text-xl">account_balance_wallet</span>
+<span class="text-sm font-medium">Portafolio y Diario</span>
+</div>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<button class="w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white py-2.5 rounded-lg text-sm font-bold transition-all glow-blue">
+<span class="material-symbols-outlined text-sm">add</span>
+            New Analysis
+        </button>
+</div>
+</aside>
+<main class="flex-1 flex flex-col overflow-hidden">
+<header class="h-20 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 bg-background-light dark:bg-background-dark">
+<div class="flex items-center gap-6">
+<h2 class="text-xl font-bold tracking-tight">Renta Fija &amp; Carry Trade Analysis</h2>
+<div class="h-8 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
+<div class="flex gap-4">
+<div class="flex flex-col">
+<span class="text-[10px] uppercase font-bold text-slate-500">Target Inflation</span>
+<input class="bg-transparent border-none p-0 text-sm font-bold focus:ring-0 text-primary w-12" type="text" value="4.2%"/>
+</div>
+<div class="flex flex-col">
+<span class="text-[10px] uppercase font-bold text-slate-500">Exp. Devaluation</span>
+<input class="bg-transparent border-none p-0 text-sm font-bold focus:ring-0 text-primary w-12" type="text" value="3.5%"/>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-transparent dark:border-slate-700">
+<span class="material-symbols-outlined text-sm text-slate-400">search</span>
+<input class="bg-transparent border-none p-0 text-xs focus:ring-0 w-32 placeholder-slate-500" placeholder="Search Ticker..." type="text"/>
+</div>
+<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 relative text-slate-500">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 size-2 bg-danger rounded-full border-2 border-background-dark"></span>
+</button>
+<div class="size-9 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-500">person</span>
+</div>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-hide">
+<section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<div class="p-5 rounded-xl bg-background-light dark:bg-card-dark border border-slate-200 dark:border-slate-800">
+<div class="flex justify-between items-start mb-2">
+<span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">EMBI+ (Riesgo País)</span>
+<span class="text-danger flex items-center text-xs font-bold">
+<span class="material-symbols-outlined text-sm">trending_down</span> -15%
+                    </span>
+</div>
+<div class="text-2xl font-extrabold">1,250 <span class="text-sm font-medium text-slate-500">bps</span></div>
+</div>
+<div class="p-5 rounded-xl bg-background-light dark:bg-card-dark border border-slate-200 dark:border-slate-800">
+<div class="flex justify-between items-start mb-2">
+<span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Exp. Monthly Inflation</span>
+<span class="text-danger flex items-center text-xs font-bold">
+<span class="material-symbols-outlined text-sm">trending_down</span> -0.5%
+                    </span>
+</div>
+<div class="text-2xl font-extrabold">4.2% <span class="text-sm font-medium text-slate-500">monthly</span></div>
+</div>
+<div class="p-5 rounded-xl bg-background-light dark:bg-card-dark border border-slate-200 dark:border-slate-800">
+<div class="flex justify-between items-start mb-2">
+<span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Exp. CCL Devaluation</span>
+<span class="text-danger flex items-center text-xs font-bold">
+<span class="material-symbols-outlined text-sm">trending_down</span> -1.2%
+                    </span>
+</div>
+<div class="text-2xl font-extrabold">3.5% <span class="text-sm font-medium text-slate-500">monthly</span></div>
+</div>
+<div class="p-5 rounded-xl bg-background-light dark:bg-card-dark border border-slate-200 dark:border-slate-800">
+<div class="flex justify-between items-start mb-2">
+<span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Proj. Real Rate (CER)</span>
+<span class="text-success flex items-center text-xs font-bold">
+<span class="material-symbols-outlined text-sm">trending_up</span> +0.8%
+                    </span>
+</div>
+<div class="text-2xl font-extrabold">8.1% <span class="text-sm font-medium text-slate-500">annual</span></div>
+</div>
+</section>
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[500px]">
+<div class="lg:col-span-8 flex flex-col rounded-xl bg-background-light dark:bg-card-dark border border-slate-200 dark:border-slate-800 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+<h3 class="font-bold text-sm">Yield Curve Monitor</h3>
+<div class="flex bg-slate-100 dark:bg-background-dark p-1 rounded-lg">
+<button class="px-3 py-1.5 text-[10px] font-bold uppercase rounded bg-primary text-white">Soberana HD</button>
+<button class="px-3 py-1.5 text-[10px] font-bold uppercase rounded text-slate-500 hover:text-slate-300">CER</button>
+<button class="px-3 py-1.5 text-[10px] font-bold uppercase rounded text-slate-500 hover:text-slate-300">LECAP</button>
+<button class="px-3 py-1.5 text-[10px] font-bold uppercase rounded text-slate-500 hover:text-slate-300">Corp</button>
+</div>
+</div>
+<div class="flex-1 relative p-6">
+<div class="absolute inset-6 border-l-2 border-b-2 border-slate-200 dark:border-slate-800 flex flex-col">
+<div class="absolute -left-8 top-0 h-full flex flex-col justify-between text-[10px] font-bold text-slate-500 py-2">
+<span>35%</span><span>30%</span><span>25%</span><span>20%</span><span>15%</span><span>10%</span>
+</div>
+<div class="absolute -bottom-6 left-0 w-full flex justify-between text-[10px] font-bold text-slate-500 px-2">
+<span>0</span><span>2Y</span><span>4Y</span><span>6Y</span><span>8Y</span><span>10Y+</span>
+</div>
+<div class="flex-1 grid grid-cols-5 grid-rows-5 opacity-10">
+<div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div>
+<div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div>
+<div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div>
+<div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div>
+<div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div><div class="border-t border-r border-slate-400"></div>
+</div>
+<div class="absolute top-1/4 left-1/4 size-2 rounded-full bg-slate-400/30"></div>
+<div class="absolute top-1/3 left-1/2 size-2 rounded-full bg-slate-400/30"></div>
+<div class="absolute top-1/2 left-3/4 size-2 rounded-full bg-slate-400/30"></div>
+<div class="absolute top-1/2 left-20 size-2 rounded-full bg-slate-400/30"></div>
+<div class="absolute top-[60%] left-[15%] flex flex-col items-center">
+<div class="size-4 rounded-full bg-primary glow-blue border-2 border-white dark:border-background-dark"></div>
+<span class="text-[9px] font-bold mt-1">AL30</span>
+</div>
+<div class="absolute top-[45%] left-[25%] flex flex-col items-center">
+<div class="size-4 rounded-full bg-success glow-green border-2 border-white dark:border-background-dark"></div>
+<span class="text-[9px] font-bold mt-1">GD30</span>
+</div>
+<div class="absolute top-[35%] left-[45%] flex flex-col items-center">
+<div class="size-4 rounded-full bg-primary glow-blue border-2 border-white dark:border-background-dark"></div>
+<span class="text-[9px] font-bold mt-1">AE38</span>
+</div>
+<div class="absolute top-[28%] left-[70%] flex flex-col items-center">
+<div class="size-4 rounded-full bg-success glow-green border-2 border-white dark:border-background-dark"></div>
+<span class="text-[9px] font-bold mt-1">GD35</span>
+</div>
+<svg class="absolute inset-0 size-full overflow-visible pointer-events-none">
+<path class="opacity-40" d="M 0 350 Q 150 250, 400 150 T 800 100" fill="none" stroke="#1e94f6" stroke-dasharray="4 4" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+<div class="px-6 py-3 border-t border-slate-200 dark:border-slate-800 text-[10px] text-slate-500 flex justify-between">
+<span>X-Axis: Modified Duration (Years)</span>
+<span>Y-Axis: TIR Anualizada (%)</span>
+</div>
+</div>
+<div class="lg:col-span-4 flex flex-col gap-6">
+<div class="flex-1 flex flex-col rounded-xl bg-background-light dark:bg-card-dark border border-slate-200 dark:border-slate-800 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+<h3 class="font-bold text-sm">Carry Ranking</h3>
+<span class="px-2 py-1 rounded bg-success/20 text-success text-[10px] font-bold uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px] font-bold">rocket_launch</span>
+                            Bullish Pesos
+                        </span>
+</div>
+<div class="flex-1 overflow-x-auto">
+<table class="w-full text-left text-xs">
+<thead class="bg-slate-50 dark:bg-background-dark text-slate-500">
+<tr>
+<th class="px-4 py-2.5 font-semibold">Ticker</th>
+<th class="px-4 py-2.5 font-semibold">TEM %</th>
+<th class="px-4 py-2.5 font-semibold">v. Inf %</th>
+<th class="px-4 py-2.5 font-semibold">USD %</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr>
+<td class="px-4 py-3 font-bold">S31E4</td>
+<td class="px-4 py-3 text-success">4.8%</td>
+<td class="px-4 py-3">+0.6%</td>
+<td class="px-4 py-3 font-semibold">1.2%</td>
+</tr>
+<tr>
+<td class="px-4 py-3 font-bold">LECAP</td>
+<td class="px-4 py-3 text-success">4.2%</td>
+<td class="px-4 py-3">+0.0%</td>
+<td class="px-4 py-3 font-semibold">0.8%</td>
+</tr>
+<tr class="bg-primary/5">
+<td class="px-4 py-3 font-bold">AL30</td>
+<td class="px-4 py-3 text-success">5.5%</td>
+<td class="px-4 py-3">+1.3%</td>
+<td class="px-4 py-3 font-semibold text-primary">2.1%</td>
+</tr>
+<tr>
+<td class="px-4 py-3 font-bold">TX26</td>
+<td class="px-4 py-3 text-success">3.9%</td>
+<td class="px-4 py-3">-0.3%</td>
+<td class="px-4 py-3 font-semibold">0.4%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="h-40 rounded-xl bg-background-light dark:bg-card-dark border border-slate-200 dark:border-slate-800 p-4 flex flex-col">
+<h4 class="text-[10px] font-bold text-slate-500 uppercase mb-2">Breakeven Devaluation</h4>
+<div class="flex-1 relative">
+<svg class="w-full h-full">
+<linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#1e94f6" stop-opacity="0.3"></stop>
+<stop offset="100%" stop-color="#1e94f6" stop-opacity="0"></stop>
+</linearGradient>
+<path d="M 0 80 Q 50 40, 100 60 T 200 20 T 300 50 L 300 100 L 0 100 Z" fill="url(#chartGradient)"></path>
+<path d="M 0 80 Q 50 40, 100 60 T 200 20 T 300 50" fill="none" stroke="#1e94f6" stroke-width="2"></path>
+</svg>
+<div class="absolute top-0 right-0 text-xl font-bold">4.85%</div>
+</div>
+</div>
+</div>
+</section>
+<section class="rounded-xl glass-panel border border-slate-200 dark:border-slate-800 overflow-hidden">
+<div class="px-8 py-6 flex items-center justify-between border-b border-white/5">
+<div class="flex items-center gap-4">
+<h3 class="font-bold text-lg">Trading Journal</h3>
+<div class="flex gap-2">
+<span class="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold">All Asset Classes</span>
+<span class="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold">Last 30 Days</span>
+</div>
+</div>
+<button class="flex items-center gap-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 px-4 py-2 rounded-lg text-sm font-bold transition-all border border-emerald-500/30 glow-green">
+<span class="material-symbols-outlined text-sm">add_circle</span>
+                    Log New Trade
+                </button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm whitespace-nowrap">
+<thead class="bg-slate-50/50 dark:bg-background-dark/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+<tr>
+<th class="px-8 py-4">Fecha</th>
+<th class="px-8 py-4">Lado</th>
+<th class="px-8 py-4">Ticker</th>
+<th class="px-8 py-4 text-right">Cantidad</th>
+<th class="px-8 py-4 text-right">Cap. Invertido</th>
+<th class="px-8 py-4 text-right">PPP</th>
+<th class="px-8 py-4 text-right">P&amp;L (%)</th>
+<th class="px-8 py-4">Observaciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-8 py-4 font-medium text-slate-400">2023-11-24</td>
+<td class="px-8 py-4">
+<span class="flex items-center gap-2 text-success">
+<span class="material-symbols-outlined text-sm fill-1">shopping_cart</span>
+                                    BUY
+                                </span>
+</td>
+<td class="px-8 py-4 font-bold text-slate-100">AL30</td>
+<td class="px-8 py-4 text-right font-mono">15,000</td>
+<td class="px-8 py-4 text-right font-mono">$5,820.00</td>
+<td class="px-8 py-4 text-right font-mono">38.80</td>
+<td class="px-8 py-4 text-right font-bold text-success">+12.4%</td>
+<td class="px-8 py-4 text-xs text-slate-400">Increased duration on EMBI compression thesis.</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-8 py-4 font-medium text-slate-400">2023-11-22</td>
+<td class="px-8 py-4">
+<span class="flex items-center gap-2 text-danger">
+<span class="material-symbols-outlined text-sm fill-1">sell</span>
+                                    SELL
+                                </span>
+</td>
+<td class="px-8 py-4 font-bold text-slate-100">S31E4</td>
+<td class="px-8 py-4 text-right font-mono">2,500,000</td>
+<td class="px-8 py-4 text-right font-mono">$2,450.00</td>
+<td class="px-8 py-4 text-right font-mono">1.02</td>
+<td class="px-8 py-4 text-right font-bold text-success">+4.2%</td>
+<td class="px-8 py-4 text-xs text-slate-400">Profit taking after LECAP auction results.</td>
+</tr>
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-8 py-4 font-medium text-slate-400">2023-11-20</td>
+<td class="px-8 py-4">
+<span class="flex items-center gap-2 text-success">
+<span class="material-symbols-outlined text-sm fill-1">shopping_cart</span>
+                                    BUY
+                                </span>
+</td>
+<td class="px-8 py-4 font-bold text-slate-100">GD35</td>
+<td class="px-8 py-4 text-right font-mono">8,000</td>
+<td class="px-8 py-4 text-right font-mono">$2,800.00</td>
+<td class="px-8 py-4 text-right font-mono">35.00</td>
+<td class="px-8 py-4 text-right font-bold text-danger">-2.1%</td>
+<td class="px-8 py-4 text-xs text-slate-400">Long term structural hedge.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</main>
+
+</body></html>

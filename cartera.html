@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Análisis de Portafolio Detail | QuantTerminal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#258cf4",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0B0E11",
+                        "accent-green": "#10b981",
+                        "accent-red": "#ef4444",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .modal-glass { background: rgba(11, 14, 17, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .neon-glow-green { filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6)); }
+        .neon-glow-blue { filter: drop-shadow(0 0 8px rgba(37, 140, 244, 0.6)); }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex relative overflow-hidden">
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background-dark/60 backdrop-blur-sm">
+<div class="modal-glass w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+<div class="px-8 py-6 border-b border-white/10 flex justify-between items-center">
+<h2 class="text-xl font-bold tracking-tight">Registrar Nueva Operación</h2>
+<button class="text-slate-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="p-8 space-y-6">
+<div class="grid grid-cols-2 gap-6">
+<div class="col-span-2 relative">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Activo / Ticker</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xl">search</span>
+<input class="w-full bg-white/5 border border-white/10 rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-600" placeholder="Buscar ticker (ej. AL30, GGAL, AAPL...)" type="text"/>
+</div>
+</div>
+<div class="col-span-2">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tipo de Operación</label>
+<div class="grid grid-cols-2 p-1 bg-white/5 rounded-xl border border-white/10">
+<button class="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-accent-green text-white font-bold shadow-lg shadow-accent-green/20">
+<span class="material-symbols-outlined text-xl">add_circle</span>
+                            Compra
+                        </button>
+<button class="flex items-center justify-center gap-2 py-2.5 rounded-lg text-slate-400 hover:text-white font-bold transition-all">
+<span class="material-symbols-outlined text-xl">remove_circle</span>
+                            Venta
+                        </button>
+</div>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cantidad</label>
+<input class="w-full bg-white/5 border border-white/10 rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" placeholder="0" step="1" type="number"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Precio</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">$</span>
+<input class="w-full bg-white/5 border border-white/10 rounded-lg py-3 pl-8 pr-4 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Fecha y Hora</label>
+<input class="w-full bg-white/5 border border-white/10 rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all text-slate-300" type="datetime-local"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Comisiones e Imp.</label>
+<div class="relative">
+<span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">$</span>
+<input class="w-full bg-white/5 border border-white/10 rounded-lg py-3 pl-8 pr-4 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+<div class="col-span-2">
+<label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Observaciones / Tesis</label>
+<textarea class="w-full bg-white/5 border border-white/10 rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none" placeholder="Detalles de la operación..." rows="3"></textarea>
+</div>
+</div>
+</div>
+<div class="px-8 py-6 border-t border-white/10 bg-white/[0.02] flex items-center justify-end gap-6">
+<button class="text-sm font-semibold text-slate-400 hover:text-white transition-colors">Cancelar</button>
+<button class="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-xl shadow-primary/20 flex items-center gap-2">
+                Confirmar Operación
+            </button>
+</div>
+</div>
+</div>
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col fixed h-full bg-background-light dark:bg-background-dark z-20">
+<div class="p-6 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white">query_stats</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight">QuantTerminal</h1>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a href="index.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">dashboard</span><span class="text-sm font-medium">Dashboard</span></a>
+<a href="curvas.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">monitoring</span><span class="text-sm font-medium">Monitor de Curvas</span></a>
+<a href="carry_trade.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">currency_exchange</span><span class="text-sm font-medium">Carry Trade</span></a>
+<a href="cartera.html" class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg transition-colors">
+<span class="material-symbols-outlined">account_balance_wallet</span><span class="text-sm font-medium">Portafolio y Diario</span></a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3 p-2">
+<div class="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+<div>
+<p class="text-xs font-semibold">Premium User</p>
+<p class="text-[10px] text-slate-500 uppercase">Argentine Desk</p>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 ml-64 p-8 overflow-y-auto blur-sm">
+<header class="flex justify-between items-center mb-8">
+<div>
+<h2 class="text-2xl font-bold tracking-tight">Análisis del Portafolio Sugerido</h2>
+<p class="text-slate-500 text-sm">Actualización en tiempo real • Último cierre: 17:00 ART</p>
+</div>
+<div class="flex gap-4">
+<button class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-semibold text-sm transition-all shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-[20px]">add</span>
+                Nueva Entrada
+            </button>
+<button class="bg-slate-100 dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="glass p-6 rounded-xl relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-bold text-primary uppercase tracking-widest">RV Local</span>
+<span class="text-accent-green text-sm font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">arrow_upward</span> 2.4%
+                </span>
+</div>
+<div class="text-3xl font-bold mb-2">45.2%</div>
+<div class="w-full h-12">
+<svg class="w-full h-full stroke-primary fill-none stroke-2" viewBox="0 0 100 20">
+<path d="M0 15 Q 10 12, 20 16 T 40 10 T 60 14 T 80 8 T 100 5"></path>
+</svg>
+</div>
+</div>
+<div class="glass p-6 rounded-xl relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-bold text-primary uppercase tracking-widest">RV Global</span>
+<span class="text-accent-red text-sm font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">arrow_downward</span> 0.5%
+                </span>
+</div>
+<div class="text-3xl font-bold mb-2">30.8%</div>
+<div class="w-full h-12">
+<svg class="w-full h-full stroke-primary/60 fill-none stroke-2" viewBox="0 0 100 20">
+<path d="M0 5 Q 10 8, 20 6 T 40 12 T 60 9 T 80 15 T 100 13"></path>
+</svg>
+</div>
+</div>
+<div class="glass p-6 rounded-xl relative overflow-hidden">
+<div class="flex justify-between items-start mb-4">
+<span class="text-xs font-bold text-primary uppercase tracking-widest">RF Local</span>
+<span class="text-accent-green text-sm font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">arrow_upward</span> 1.2%
+                </span>
+</div>
+<div class="text-3xl font-bold mb-2">24.0%</div>
+<div class="w-full h-12">
+<svg class="w-full h-full stroke-primary fill-none stroke-2" viewBox="0 0 100 20">
+<path d="M0 18 Q 10 16, 20 17 T 40 14 T 60 10 T 80 12 T 100 8"></path>
+</svg>
+</div>
+</div>
+</div>
+<div class="glass rounded-xl p-8 mb-8">
+<div class="flex justify-between items-center mb-6">
+<h3 class="text-lg font-bold">Curva de Rendimiento (Duration vs TIR)</h3>
+<div class="flex items-center gap-4 text-xs font-medium text-slate-500">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-slate-600"></div> Mercado
+                </div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-accent-green shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div> Cartera
+                </div>
+</div>
+</div>
+<div class="relative h-[400px] w-full border-l border-b border-slate-700/50">
+<div class="absolute -left-12 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] font-bold text-slate-600 tracking-widest">TIR (%)</div>
+<div class="absolute -bottom-8 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-600 tracking-widest uppercase">Modified Duration</div>
+<svg class="absolute inset-0 w-full h-full overflow-visible" viewBox="0 0 1000 400">
+<path class="stroke-primary fill-none stroke-[3] neon-glow-blue opacity-80" d="M50 350 Q 200 300, 400 220 T 700 120 T 950 80"></path>
+<circle class="fill-slate-700/40" cx="120" cy="320" r="3"></circle>
+<circle class="fill-slate-700/40" cx="180" cy="340" r="3"></circle>
+<circle class="fill-slate-700/40" cx="250" cy="280" r="3"></circle>
+<circle class="fill-slate-700/40" cx="320" cy="240" r="3"></circle>
+<circle class="fill-slate-700/40" cx="450" cy="210" r="3"></circle>
+<circle class="fill-slate-700/40" cx="550" cy="190" r="3"></circle>
+<circle class="fill-slate-700/40" cx="680" cy="140" r="3"></circle>
+<circle class="fill-slate-700/40" cx="820" cy="100" r="3"></circle>
+<circle class="fill-slate-700/40" cx="900" cy="90" r="3"></circle>
+<g class="portfolio-node">
+<circle class="fill-accent-green neon-glow-green" cx="400" cy="220" r="8"></circle>
+<text class="fill-accent-green text-[14px] font-bold" x="415" y="215">AL30</text>
+</g>
+<g class="portfolio-node">
+<circle class="fill-accent-green neon-glow-green" cx="700" cy="120" r="8"></circle>
+<text class="fill-accent-green text-[14px] font-bold" x="715" y="115">GD30</text>
+</g>
+<g class="portfolio-node">
+<circle class="fill-accent-green neon-glow-green" cx="580" cy="165" r="8"></circle>
+<text class="fill-accent-green text-[14px] font-bold" x="595" y="160">AL35</text>
+</g>
+<g class="portfolio-node">
+<circle class="fill-accent-green neon-glow-green" cx="280" cy="275" r="8"></circle>
+<text class="fill-accent-green text-[14px] font-bold" x="295" y="270">AE38</text>
+</g>
+</svg>
+</div>
+</div>
+<section class="mb-8">
+<h3 class="text-lg font-bold mb-4">Métricas de Activos</h3>
+<div class="glass rounded-xl overflow-hidden">
+<table class="w-full text-left">
+<thead class="bg-white/5 border-b border-white/10">
+<tr>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Ticker</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Sector</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Rend. Esperado (%)</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">TIR (%)</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Fama-French Score</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-6 py-4 font-bold text-accent-green">AL30</td>
+<td class="px-6 py-4 text-sm">Soberano USD</td>
+<td class="px-6 py-4 text-sm font-medium">12.4%</td>
+<td class="px-6 py-4 text-sm font-medium">42.5%</td>
+<td class="px-6 py-4 text-sm">
+<div class="flex items-center gap-2">
+<div class="w-12 h-2 bg-slate-700 rounded-full overflow-hidden">
+<div class="w-[85%] h-full bg-primary"></div>
+</div>
+<span class="text-xs">0.85</span>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section>
+<h3 class="text-lg font-bold mb-4">Diario de Operaciones</h3>
+<div class="glass rounded-xl overflow-x-auto">
+<table class="w-full text-left whitespace-nowrap">
+<thead class="bg-white/5 border-b border-white/10">
+<tr>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Fecha</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Operatoria</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Ticker</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Cant.</th>
+<th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">P&amp;L</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5">
+<tr class="hover:bg-white/5 transition-colors">
+<td class="px-6 py-4 text-sm">24 Oct 2023</td>
+<td class="px-6 py-4">
+<span class="bg-accent-green/20 text-accent-green px-2 py-1 rounded text-[10px] font-bold uppercase">Compra</span>
+</td>
+<td class="px-6 py-4 font-bold">AL30</td>
+<td class="px-6 py-4 text-sm">5,000</td>
+<td class="px-6 py-4 text-sm font-bold text-accent-green">+US$ 312.40</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+
+</body></html>

@@ -240,11 +240,15 @@ def generar_html(datos_js: str) -> str:
 <span class="material-symbols-outlined text-primary">analytics</span> QUANT TERMINAL </h1>
 <p class="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-widest">Premium Analytics v6.2</p>
 </div>
-<nav class="flex-1 px-4 space-y-2 mt-4">
-<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/10 text-primary group" href="#">
-<span class="material-symbols-outlined">dashboard</span> <span class="text-sm font-semibold">Dashboard Principal</span> </a>
-<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" href="#">
-<span class="material-symbols-outlined">pie_chart</span> <span class="text-sm font-medium">Análisis de Cartera</span> </a>
+<nav class="flex-1 px-4 space-y-1 mt-4">
+<a href="index.html" class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg transition-colors">
+<span class="material-symbols-outlined">dashboard</span><span class="text-sm font-medium">Dashboard</span></a>
+<a href="curvas.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">monitoring</span><span class="text-sm font-medium">Monitor de Curvas</span></a>
+<a href="carry_trade.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">currency_exchange</span><span class="text-sm font-medium">Carry Trade</span></a>
+<a href="cartera.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">account_balance_wallet</span><span class="text-sm font-medium">Portafolio y Diario</span></a>
 </nav>
 <div class="p-4 mt-auto border-t border-slate-200 dark:border-slate-800">
 <div class="mt-4 flex items-center gap-3 px-3 py-2">

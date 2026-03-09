@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Yield Curve Monitor Detail</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3d99f5",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0B0E11",
+                        "card-dark": "#161b22",
+                        "accent-success": "#10b981",
+                        "accent-error": "#ef4444",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            scrollbar-width: thin;
+            scrollbar-color: #314d68 #0B0E11;
+        }
+        .glass-panel {
+            background: rgba(22, 27, 34, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .curve-point:hover .point-label {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-background-light dark:bg-background-dark">
+<div class="p-6 flex items-center gap-3">
+<div class="size-8 bg-primary rounded flex items-center justify-center text-white">
+<span class="material-symbols-outlined">query_stats</span>
+</div>
+<div>
+<h1 class="text-sm font-black uppercase tracking-wider text-primary">FinTech Terminal</h1>
+<p class="text-[10px] text-slate-500 dark:text-slate-400 font-medium">ARGENTINE MARKET PRO</p>
+</div>
+</div>
+<nav class="flex-1 px-4 space-y-1">
+<a href="index.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">dashboard</span><span class="text-sm font-medium">Dashboard</span></a>
+<a href="curvas.html" class="flex items-center gap-3 px-3 py-2 bg-primary/10 text-primary rounded-lg transition-colors">
+<span class="material-symbols-outlined">monitoring</span><span class="text-sm font-medium">Monitor de Curvas</span></a>
+<a href="carry_trade.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">currency_exchange</span><span class="text-sm font-medium">Carry Trade</span></a>
+<a href="cartera.html" class="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined">account_balance_wallet</span><span class="text-sm font-medium">Portafolio y Diario</span></a>
+</nav>
+<div class="p-4 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-3 p-2 mb-4">
+<div class="size-10 rounded-full bg-slate-200 dark:bg-slate-700" data-alt="User profile avatar circle" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBNo_qz3g-zd9BH4ZBnRflpP98SKIO6JvxHiTODYxC-v02LOBIGTVtbA43iWgeo1Nfa__ex6_bpTLe008xeswRGX4Bs4tm04dX0U1cUlo1uHXT6kNx7y9Nlx_M1Jx59sY5CdCK_iS2m56eSFXILneN6yWoXoGMFiBOE3lYlkN1BvdTfVDez337B_A3Hav_XieNOeuGlQNrC--Kj49ShWLHCI-87ebngMI59Gnozv5roVdjRDsaeEjck02uPH-jkzfDP9ZKlwPzLURsp')"></div>
+<div class="overflow-hidden">
+<p class="text-xs font-bold truncate">Premium User</p>
+<p class="text-[10px] text-slate-500">Tier: Institutional</p>
+</div>
+</div>
+<button class="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-slate-200 dark:bg-slate-800 text-xs font-bold hover:bg-accent-error hover:text-white transition-all">
+<span class="material-symbols-outlined text-sm">logout</span>
+                Cerrar Sesión
+            </button>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col overflow-y-auto">
+<!-- Header -->
+<header class="p-6 border-b border-slate-200 dark:border-slate-800 bg-background-light/50 dark:bg-background-dark/50 backdrop-blur-md sticky top-0 z-10">
+<div class="flex items-center justify-between">
+<div>
+<div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mb-1">
+<span>Análisis de Renta Fija</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span class="text-primary">Monitor de Curvas</span>
+</div>
+<h2 class="text-2xl font-black tracking-tight">Monitor de Curvas de Rendimiento</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined text-sm">download</span>
+                        Exportar Excel
+                    </button>
+</div>
+</div>
+</header>
+<!-- Curve Selector Tabs -->
+<div class="px-6 pt-6">
+<div class="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl w-max">
+<button class="px-6 py-2 rounded-lg text-sm font-bold bg-primary text-white shadow-sm">Soberana Hard $</button>
+<button class="px-6 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Corporativa Hard $</button>
+<button class="px-6 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Curva CER</button>
+<button class="px-6 py-2 rounded-lg text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">LECAP / LECER</button>
+</div>
+</div>
+<!-- Main Grid -->
+<div class="p-6 grid grid-cols-12 gap-6">
+<!-- Chart Section -->
+<div class="col-span-12 lg:col-span-9 flex flex-col gap-6">
+<div class="glass-panel rounded-2xl p-6 relative h-[500px] flex flex-col">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h3 class="font-bold text-slate-300">Curva Soberana (TIR vs MD)</h3>
+<p class="text-xs text-slate-500">Última actualización: Hace 2 minutos</p>
+</div>
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<span class="size-2 rounded-full bg-primary"></span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">Actual</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="size-2 rounded-full border border-dashed border-slate-500"></span>
+<span class="text-[10px] font-bold text-slate-400 uppercase">T-1 Month</span>
+</div>
+</div>
+</div>
+<!-- Mock Chart Container -->
+<div class="flex-1 relative border-l border-b border-slate-700/50 ml-8 mb-8">
+<!-- Y-Axis Labels -->
+<div class="absolute -left-10 h-full flex flex-col justify-between text-[10px] text-slate-500 font-mono py-1">
+<span>45%</span><span>35%</span><span>25%</span><span>15%</span><span>5%</span>
+</div>
+<!-- X-Axis Labels -->
+<div class="absolute -bottom-8 w-full flex justify-between text-[10px] text-slate-500 font-mono px-1">
+<span>0y</span><span>2y</span><span>4y</span><span>6y</span><span>8y</span><span>10y+</span>
+</div>
+<!-- Grid Lines -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
+<div class="w-full h-px bg-slate-800/30"></div>
+<div class="w-full h-px bg-slate-800/30"></div>
+<div class="w-full h-px bg-slate-800/30"></div>
+<div class="w-full h-px bg-slate-800/30"></div>
+<div class="w-full h-px bg-slate-800/30"></div>
+</div>
+<!-- Curve Spline (SVG) -->
+<svg class="absolute inset-0 w-full h-full overflow-visible" preserveaspectratio="none">
+<!-- Comparison Curve (Dashed) -->
+<path d="M 0 350 Q 150 250, 400 180 T 850 120" fill="none" stroke="rgba(148, 163, 184, 0.3)" stroke-dasharray="4,4" stroke-width="2"></path>
+<!-- Main Curve -->
+<path d="M 0 380 Q 200 300, 450 150 T 850 80" fill="none" stroke="url(#lineGradient)" stroke-width="3"></path>
+<defs>
+<lineargradient id="lineGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" stop-color="#3d99f5"></stop>
+<stop offset="100%" stop-color="#3d99f5"></stop>
+</lineargradient>
+</defs>
+</svg>
+<!-- Data Points -->
+<!-- GD29 -->
+<div class="absolute group curve-point" style="left: 15%; top: 68%;">
+<div class="size-2 bg-primary rounded-full shadow-[0_0_8px_rgba(61,153,245,0.6)] cursor-pointer"></div>
+<span class="absolute -top-6 -left-2 text-[10px] font-black text-white bg-slate-900 px-1 rounded">GD29</span>
+</div>
+<!-- AL30 -->
+<div class="absolute group curve-point" style="left: 25%; top: 55%;">
+<div class="size-2 bg-primary rounded-full shadow-[0_0_8px_rgba(61,153,245,0.6)] cursor-pointer"></div>
+<span class="absolute -top-6 -left-2 text-[10px] font-black text-white bg-slate-900 px-1 rounded">AL30</span>
+</div>
+<!-- GD35 -->
+<div class="absolute group curve-point" style="left: 55%; top: 32%;">
+<div class="size-2 bg-primary rounded-full shadow-[0_0_8px_rgba(61,153,245,0.6)] cursor-pointer"></div>
+<span class="absolute -top-6 -left-2 text-[10px] font-black text-white bg-slate-900 px-1 rounded">GD35</span>
+</div>
+<!-- AL41 -->
+<div class="absolute group curve-point" style="left: 80%; top: 18%;">
+<div class="size-2 bg-primary rounded-full shadow-[0_0_8px_rgba(61,153,245,0.6)] cursor-pointer"></div>
+<span class="absolute -top-6 -left-2 text-[10px] font-black text-white bg-slate-900 px-1 rounded">AL41</span>
+</div>
+</div>
+</div>
+<!-- Table Section -->
+<div class="glass-panel rounded-2xl overflow-hidden">
+<div class="p-6 border-b border-slate-800 flex justify-between items-center">
+<h3 class="font-bold text-slate-300">Constituyentes de la Curva</h3>
+<div class="flex gap-2">
+<span class="px-2 py-1 rounded bg-accent-success/10 text-accent-success text-[10px] font-bold uppercase tracking-tight border border-accent-success/20">Sugerencias: Bonos Viables</span>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-800">
+<th class="px-6 py-4">Ticker</th>
+<th class="px-6 py-4">Descripción</th>
+<th class="px-6 py-4 text-right">TIR (%)</th>
+<th class="px-6 py-4 text-right">MD</th>
+<th class="px-6 py-4 text-right">Convexidad</th>
+<th class="px-6 py-4 text-right">Paridad (%)</th>
+<th class="px-6 py-4 text-right">Volumen</th>
+<th class="px-6 py-4 text-right">TEM</th>
+</tr>
+</thead>
+<tbody class="text-sm">
+<tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4 font-bold text-primary">AL30</td>
+<td class="px-6 py-4 text-slate-400">Bonos Rep. Arg. USD 2030 L.A.</td>
+<td class="px-6 py-4 text-right font-mono">24.50%</td>
+<td class="px-6 py-4 text-right font-mono">2.14</td>
+<td class="px-6 py-4 text-right font-mono">0.08</td>
+<td class="px-6 py-4 text-right font-mono text-accent-success">56.2%</td>
+<td class="px-6 py-4 text-right font-mono">42M</td>
+<td class="px-6 py-4 text-right font-mono">1.8%</td>
+</tr>
+<tr class="border-b border-slate-800/50 bg-accent-success/5 border-l-4 border-l-accent-success hover:bg-accent-success/10 transition-colors">
+<td class="px-6 py-4 font-bold text-primary flex items-center gap-2">
+                                        GD30
+                                        <span class="material-symbols-outlined text-accent-success text-[16px]">stars</span>
+</td>
+<td class="px-6 py-4 text-slate-400">Bonos Rep. Arg. USD 2030 L.NY</td>
+<td class="px-6 py-4 text-right font-mono">22.80%</td>
+<td class="px-6 py-4 text-right font-mono">2.35</td>
+<td class="px-6 py-4 text-right font-mono">0.09</td>
+<td class="px-6 py-4 text-right font-mono text-accent-success">58.4%</td>
+<td class="px-6 py-4 text-right font-mono">128M</td>
+<td class="px-6 py-4 text-right font-mono">1.6%</td>
+</tr>
+<tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4 font-bold text-primary">AL35</td>
+<td class="px-6 py-4 text-slate-400">Bonos Rep. Arg. USD 2035 L.A.</td>
+<td class="px-6 py-4 text-right font-mono">18.20%</td>
+<td class="px-6 py-4 text-right font-mono">4.12</td>
+<td class="px-6 py-4 text-right font-mono">0.15</td>
+<td class="px-6 py-4 text-right font-mono">48.1%</td>
+<td class="px-6 py-4 text-right font-mono">15M</td>
+<td class="px-6 py-4 text-right font-mono">1.2%</td>
+</tr>
+<tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4 font-bold text-primary">GD35</td>
+<td class="px-6 py-4 text-slate-400">Bonos Rep. Arg. USD 2035 L.NY</td>
+<td class="px-6 py-4 text-right font-mono">17.50%</td>
+<td class="px-6 py-4 text-right font-mono">4.28</td>
+<td class="px-6 py-4 text-right font-mono">0.16</td>
+<td class="px-6 py-4 text-right font-mono">49.8%</td>
+<td class="px-6 py-4 text-right font-mono">33M</td>
+<td class="px-6 py-4 text-right font-mono">1.1%</td>
+</tr>
+<tr class="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+<td class="px-6 py-4 font-bold text-primary">AE38</td>
+<td class="px-6 py-4 text-slate-400">Bonos Rep. Arg. USD 2038 L.A.</td>
+<td class="px-6 py-4 text-right font-mono">16.40%</td>
+<td class="px-6 py-4 text-right font-mono">5.22</td>
+<td class="px-6 py-4 text-right font-mono">0.22</td>
+<td class="px-6 py-4 text-right font-mono">51.2%</td>
+<td class="px-6 py-4 text-right font-mono">8M</td>
+<td class="px-6 py-4 text-right font-mono">1.0%</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Sidebar Controls Section -->
+<div class="col-span-12 lg:col-span-3 flex flex-col gap-6">
+<!-- Control Panel Card -->
+<div class="glass-panel rounded-2xl p-6">
+<h4 class="font-bold text-slate-300 mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">tune</span>
+                        Parámetros de Visualización
+                    </h4>
+<div class="space-y-8">
+<!-- Duration Slider -->
+<div class="space-y-3">
+<div class="flex justify-between items-center">
+<label class="text-xs font-medium text-slate-400 uppercase tracking-wider">Duration Range</label>
+<span class="text-xs font-mono text-primary bg-primary/10 px-2 rounded">0 - 10y+</span>
+</div>
+<div class="relative h-1.5 w-full bg-slate-800 rounded-full">
+<div class="absolute inset-y-0 left-0 right-1/4 bg-primary rounded-full"></div>
+<div class="absolute -top-1.5 left-0 size-4 bg-white rounded-full shadow-lg cursor-pointer border-2 border-primary"></div>
+<div class="absolute -top-1.5 right-1/4 size-4 bg-white rounded-full shadow-lg cursor-pointer border-2 border-primary"></div>
+</div>
+</div>
+<!-- Switches -->
+<div class="space-y-4">
+<div class="flex items-center justify-between">
+<span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Show Labels</span>
+<button class="w-10 h-5 bg-primary rounded-full relative flex items-center px-1">
+<div class="size-3 bg-white rounded-full absolute right-1"></div>
+</button>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Show Grid</span>
+<button class="w-10 h-5 bg-primary rounded-full relative flex items-center px-1">
+<div class="size-3 bg-white rounded-full absolute right-1"></div>
+</button>
+</div>
+<div class="flex items-center justify-between">
+<span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Show Comparison</span>
+<button class="w-10 h-5 bg-slate-700 rounded-full relative flex items-center px-1 transition-colors">
+<div class="size-3 bg-white rounded-full absolute left-1"></div>
+</button>
+</div>
+</div>
+<!-- Curve Best Fit Switch -->
+<div class="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+<div class="flex items-center justify-between mb-2">
+<span class="text-[10px] font-bold text-slate-400 uppercase">Spline Interpolation</span>
+<span class="material-symbols-outlined text-primary text-sm">info</span>
+</div>
+<select class="w-full bg-slate-900 border-none rounded-lg text-xs font-medium focus:ring-1 focus:ring-primary text-slate-300 py-2">
+<option>Natural Spline</option>
+<option>Linear Fit</option>
+<option>Polynomial (3rd Deg)</option>
+<option>Nelson-Siegel</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Quick Stats -->
+<div class="glass-panel rounded-2xl p-6">
+<h4 class="font-bold text-slate-300 mb-4 text-xs uppercase tracking-wider">Market Context</h4>
+<div class="space-y-4">
+<div class="flex justify-between items-end border-b border-slate-800 pb-2">
+<div>
+<p class="text-[10px] text-slate-500 font-bold uppercase">Riesgo País</p>
+<p class="text-lg font-black text-slate-100">1,245 <span class="text-accent-success text-xs font-bold">-12</span></p>
+</div>
+<div class="h-8 w-16 bg-accent-success/10 rounded overflow-hidden">
+<svg class="h-full w-full" viewbox="0 0 100 40">
+<path d="M0 30 Q 25 25, 50 28 T 100 10" fill="none" stroke="#10b981" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+<div class="flex justify-between items-end border-b border-slate-800 pb-2">
+<div>
+<p class="text-[10px] text-slate-500 font-bold uppercase">Brecha Cambiaria</p>
+<p class="text-lg font-black text-slate-100">18.4% <span class="text-accent-error text-xs font-bold">+0.5</span></p>
+</div>
+<div class="h-8 w-16 bg-accent-error/10 rounded overflow-hidden">
+<svg class="h-full w-full" viewbox="0 0 100 40">
+<path d="M0 20 Q 25 22, 50 15 T 100 35" fill="none" stroke="#ef4444" stroke-width="2"></path>
+</svg>
+</div>
+</div>
+</div>
+</div>
+<!-- CTA -->
+<div class="rounded-2xl p-6 bg-gradient-to-br from-primary to-blue-700 shadow-xl shadow-primary/20 relative overflow-hidden group">
+<div class="relative z-10">
+<h4 class="font-bold text-white mb-2 leading-tight">Acceso a Reportes Institucionales</h4>
+<p class="text-xs text-blue-100 mb-4 opacity-80">Descarga el análisis semanal completo de la curva soberana en PDF.</p>
+<button class="w-full py-2 bg-white/20 hover:bg-white/30 backdrop-blur text-white rounded-lg text-xs font-bold transition-all border border-white/30">
+                            Descargar Reporte
+                        </button>
+</div>
+<span class="material-symbols-outlined absolute -bottom-4 -right-4 text-[100px] text-white/10 group-hover:scale-110 transition-transform">article</span>
+</div>
+</div>
+</div>
+</main>
+</body></html>
