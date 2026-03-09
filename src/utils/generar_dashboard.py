@@ -195,222 +195,259 @@ def preparar_datos_js(df_cartera: pd.DataFrame, df_embi: pd.DataFrame, rend: dic
 # ── 5. HTML Template ──────────────────────────────────────────────────────────
 def generar_html(datos_js: str) -> str:
     return f"""<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Dashboard Cartera — Modelo Fama-French 6</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {{
+            darkMode: "class",
+            theme: {{
+                extend: {{
+                    colors: {{
+                        "primary": "#258aef",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#0B0E11",
+                        "card-dark": "#161b22",
+                        "success": "#10b981",
+                        "danger": "#ef4444",
+                    }},
+                    fontFamily: {{
+                        "display": ["Inter", "sans-serif"]
+                    }},
+                    borderRadius: {{"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"}},
+                }},
+            }},
+        }}
+    </script>
 <style>
-:root {{
-    --bg: #0b0e14;
-    --card: #151921;
-    --border: #242b36;
-    --accent: #6366f1;
-    --accent2: #06b6d4;
-    --green: #10b981;
-    --red: #ef4444;
-    --orange: #f59e0b;
-    --text: #f8fafc;
-    --muted: #94a3b8;
-}}
-* {{ box-sizing: border-box; margin: 0; padding: 0; }}
-body {{ background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 14px; padding: 24px; line-height: 1.5; }}
-.container {{ max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }}
-.header {{ grid-column: span 12; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }}
-.header h1 {{ font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }}
-.header .date {{ color: var(--muted); font-size: 11px; }}
-
-.card {{ background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; position: relative; }}
-.card-header {{ display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 8px; }}
-
-/* KPIs */
-.kpi-row {{ grid-column: span 12; display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }}
-.kpi-card {{ text-align: center; display: flex; flex-direction: column; justify-content: center; height: 100px; }}
-.kpi-val {{ font-size: 26px; font-weight: 700; display: block; }}
-.kpi-label {{ color: var(--muted); font-size: 10px; text-transform: uppercase; margin-top: 4px; }}
-
-.span-8 {{ grid-column: span 8; }}
-.span-4 {{ grid-column: span 4; }}
-.span-6 {{ grid-column: span 6; }}
-.chart-h {{ height: 280px; position: relative; }}
-
-/* Tables */
-.tabla {{ width: 100%; border-collapse: collapse; font-size: 12px; }}
-.tabla th {{ text-align: left; padding: 10px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; }}
-.tabla td {{ padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.02); }}
-.pill {{ padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }}
-.pill-hd {{ background: rgba(245,158,11,0.1); color: var(--orange); }}
-.pill-ps {{ background: rgba(16,185,129,0.1); color: var(--green); }}
-
-.badge-macro {{ background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; }}
-</style>
+        body {{ font-family: 'Inter', sans-serif; }}
+        .glass-panel {{ background: rgba(22, 27, 34, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }}
+        .custom-scrollbar::-webkit-scrollbar {{ width: 4px; }}
+        .custom-scrollbar::-webkit-scrollbar-track {{ background: transparent; }}
+        .custom-scrollbar::-webkit-scrollbar-thumb {{ background: #233648; border-radius: 10px; }}
+    </style>
 </head>
-<body>
-<div class="container">
-    <div class="header">
-        <h1>Portfolio Optimizer Pro <span style="color:var(--accent)">v6.2</span></h1>
-        <div class="date">Último Run: <span id="runDate"></span></div>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen flex overflow-hidden">
+<!-- Left Sidebar -->
+<aside class="w-64 border-r border-slate-200 dark:border-slate-800 flex flex-col h-screen bg-white dark:bg-background-dark shrink-0">
+<div class="p-6 flex flex-col gap-1">
+<h1 class="text-primary text-xl font-black tracking-tight flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">analytics</span> QUANT TERMINAL </h1>
+<p class="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-widest">Premium Analytics v6.2</p>
+</div>
+<nav class="flex-1 px-4 space-y-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/10 text-primary group" href="#">
+<span class="material-symbols-outlined">dashboard</span> <span class="text-sm font-semibold">Dashboard Principal</span> </a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" href="#">
+<span class="material-symbols-outlined">pie_chart</span> <span class="text-sm font-medium">Análisis de Cartera</span> </a>
+</nav>
+<div class="p-4 mt-auto border-t border-slate-200 dark:border-slate-800">
+<div class="mt-4 flex items-center gap-3 px-3 py-2">
+<div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">OM</div>
+<div class="flex flex-col">
+<span class="text-sm font-bold">Omar Lopez</span>
+<span class="text-[10px] text-slate-500 uppercase font-bold">Pro Member</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col h-screen overflow-y-auto custom-scrollbar">
+<header class="h-16 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 bg-white/50 dark:bg-background-dark/50 backdrop-blur-md sticky top-0 z-10">
+<div class="flex items-center gap-4">
+<h2 class="text-lg font-bold">Fama-French Market Overview</h2>
+<div class="flex items-center gap-2 px-3 py-1 bg-success/10 text-success rounded-full text-xs font-bold">
+<span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span></span> Live Data
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 text-sm font-medium text-slate-500"><span>Último Run: <span id="runDate"></span></span></div>
+</div>
+</header>
+<div class="p-8 space-y-6">
+<!-- Row 1: Portfolio Summary -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Donut & Allocation -->
+<div class="lg:col-span-2 glass-panel rounded-xl p-6 flex flex-col md:flex-row items-center gap-8">
+<div class="relative w-48 h-48 flex items-center justify-center">
+<canvas id="chartPilares"></canvas>
+</div>
+<div class="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+<div class="flex flex-col gap-1">
+<h3 class="text-slate-500 text-xs font-bold uppercase tracking-wider">Asset Allocation</h3>
+<div class="space-y-3 mt-2" id="allocationList"></div>
+</div>
+<div class="flex flex-col justify-center gap-2">
+<div class="bg-primary/10 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
+<div>
+<p class="text-[10px] font-bold text-primary uppercase">Current Signal</p>
+<p class="text-sm font-black text-primary" id="divTxt">Neutral</p>
+</div>
+<span class="material-symbols-outlined text-primary">trending_up</span>
+</div>
+<div class="mt-2 text-xs font-bold text-slate-400">
+Prob Crisis Sistémica: <span id="probCrisisTxt" class="text-danger">0%</span><br>
+Confianza Gobierno: <span id="confTxt" class="text-success">0%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- KPIs -->
+<div class="grid grid-cols-2 gap-3" id="kpiGrid">
+    <div class="glass-panel rounded-xl p-4 flex flex-col justify-center">
+        <p class="text-slate-500 text-[10px] font-bold uppercase">Retorno 6M</p>
+        <p class="text-lg font-black text-success" id="kpiRet6m">0%</p>
     </div>
-
-    <!-- KPIs -->
-    <div class="kpi-row">
-        <div class="card kpi-card">
-            <span class="kpi-val" id="kpiRet6m" style="color:var(--green)">0%</span>
-            <span class="kpi-label">Retorno 6M (USD)</span>
-        </div>
-        <div class="card kpi-card" title="CAGR Anualizado Histórico 1A">
-            <span class="kpi-val" id="kpiCAGR" style="color:var(--accent2)">0%</span>
-            <span class="kpi-label">CAGR (1A)</span>
-        </div>
-        <div class="card kpi-card">
-            <span class="kpi-val" id="kpiBetaSPY">0.00</span>
-            <span class="kpi-label">Beta SPY</span>
-        </div>
-        <div class="card kpi-card">
-            <span class="kpi-val" id="kpiBetaMerv">0.00</span>
-            <span class="kpi-label">Beta MERV</span>
-        </div>
-        <div class="card kpi-card">
-            <span class="kpi-val" id="kpiVol" style="color:var(--muted)">0%</span>
-            <span class="kpi-label">Volatilidad</span>
-        </div>
-        <div class="card kpi-card">
-            <span class="kpi-val" id="kpiSharpe" style="color:#a5b4fc">0.0</span>
-            <span class="kpi-label">Sharpe Ratio</span>
-        </div>
-        <div class="card kpi-card">
-            <span class="kpi-val" id="kpiMaxDD" style="color:var(--red)">0%</span>
-            <span class="kpi-label">Max Drawdown</span>
-        </div>
+    <div class="glass-panel rounded-xl p-4 flex flex-col justify-center">
+        <p class="text-slate-500 text-[10px] font-bold uppercase">CAGR (1A)</p>
+        <p class="text-lg font-black text-primary" id="kpiCAGR">0%</p>
     </div>
-
-    <!-- CHART -->
-    <div class="card span-8">
-        <div class="card-header">📈 Rendimiento Proyectado 6M vs Benchmarks (USD)</div>
-        <div class="chart-h"><canvas id="chartMain"></canvas></div>
+    <div class="glass-panel rounded-xl p-4 flex flex-col justify-center">
+        <p class="text-slate-500 text-[10px] font-bold uppercase">Beta SPY</p>
+        <p class="text-lg font-black text-slate-100" id="kpiBetaSPY">0.0</p>
     </div>
-
-    <!-- MACRO -->
-    <div class="card span-4">
-        <div class="card-header">🚦 Señales Macro y Escenario</div>
-        <div id="macroSignals"></div>
-        <div style="margin-top:16px;">
-            <div class="badge-macro"><span>Prob. Crisis Sistémica</span><span id="probCrisisTxt" style="font-weight:700;">0%</span></div>
-            <div class="badge-macro"><span>Confianza Gobierno</span><span id="confTxt" style="font-weight:700; color:var(--accent2);">0%</span></div>
-            <div class="badge-macro"><span>Divergencia RF/RV</span><span id="divTxt" style="font-weight:700;">Neutral</span></div>
-        </div>
+    <div class="glass-panel rounded-xl p-4 flex flex-col justify-center">
+        <p class="text-slate-500 text-[10px] font-bold uppercase">Beta MERV</p>
+        <p class="text-lg font-black text-slate-100" id="kpiBetaMerv">0.0</p>
     </div>
-
-    <!-- PILLARS -->
-    <div class="card span-4">
-        <div class="card-header">🎯 Distribución por Pilares</div>
-        <div style="height:250px;"><canvas id="chartPilares"></canvas></div>
+    <div class="glass-panel rounded-xl p-4 flex flex-col justify-center">
+        <p class="text-slate-500 text-[10px] font-bold uppercase">Sharpe</p>
+        <p class="text-lg font-black text-purple-400" id="kpiSharpe">0.0</p>
     </div>
-
-    <!-- BONDS -->
-    <div class="card span-8">
-        <div class="card-header">🛡️ Renta Fija Sugerida</div>
-        <table class="tabla">
-            <thead>
-                <tr><th>Ticker</th><th>Tipo</th><th>Tir (%)</th><th>TEM / TNA</th><th>Peso</th></tr>
-            </thead>
-            <tbody id="tbodyRF"></tbody>
-        </table>
-    </div>
-
-    <!-- RV TABLES -->
-    <div class="card span-6">
-        <div class="card-header">🌎 RV Global (Unificado)</div>
-        <div class="chart-h"><canvas id="chartRVG"></canvas></div>
-    </div>
-    <div class="card span-6">
-        <div class="card-header">🇦🇷 RV Local (Argentina)</div>
-        <div class="chart-h"><canvas id="chartRVL"></canvas></div>
+    <div class="glass-panel rounded-xl p-4 flex flex-col justify-center">
+        <p class="text-slate-500 text-[10px] font-bold uppercase">Max DD</p>
+        <p class="text-lg font-black text-danger" id="kpiMaxDD">0%</p>
     </div>
 </div>
+</section>
 
+<!-- Row 2: Asset Metrics Tables -->
+<section class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+<!-- Stocks/FF Rankings -->
+<div class="glass-panel rounded-xl overflow-hidden flex flex-col">
+<div class="px-6 py-4 border-b border-slate-800 bg-slate-800/30 flex justify-between items-center">
+<h3 class="text-sm font-bold flex items-center gap-2"><span class="material-symbols-outlined text-primary text-lg">public</span> Renta Variable (Local & Global)</h3>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm">
+<thead>
+<tr class="text-slate-500 border-b border-slate-800">
+<th class="px-6 py-3 font-bold uppercase text-[10px]">Ticker</th>
+<th class="px-6 py-3 font-bold uppercase text-[10px]">Región</th>
+<th class="px-6 py-3 font-bold uppercase text-[10px]">Peso</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-800" id="tbodyRV"></tbody>
+</table>
+</div>
+</div>
+<!-- Fixed Income -->
+<div class="glass-panel rounded-xl overflow-hidden flex flex-col">
+<div class="px-6 py-4 border-b border-slate-800 bg-slate-800/30 flex justify-between items-center">
+<h3 class="text-sm font-bold flex items-center gap-2"><span class="material-symbols-outlined text-emerald-500 text-lg">account_balance</span> Renta Fija Sugerida</h3>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm">
+<thead>
+<tr class="text-slate-500 border-b border-slate-800">
+<th class="px-6 py-3 font-bold uppercase text-[10px]">Ticker</th>
+<th class="px-6 py-3 font-bold uppercase text-[10px]">Tipo</th>
+<th class="px-6 py-3 font-bold uppercase text-[10px]">TIR / Rend</th>
+<th class="px-6 py-3 font-bold uppercase text-[10px]">Peso</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-800" id="tbodyRF"></tbody>
+</table>
+</div>
+</div>
+</section>
+
+<!-- Row 3: Curve Monitor -->
+<section class="grid grid-cols-1 gap-6">
+<div class="glass-panel rounded-xl flex flex-col">
+<div class="p-6 border-b border-slate-800"><h3 class="text-sm font-bold flex items-center gap-2"><span class="material-symbols-outlined text-primary text-lg">show_chart</span> Rendimiento Proyectado 6M vs Benchmarks</h3></div>
+<div class="p-6 flex-1 min-h-[350px] relative w-full"><canvas id="chartMain"></canvas></div>
+</div>
+</section>
+</div>
+</main>
 <script>
 const D = {datos_js};
 document.getElementById('runDate').textContent = D.meta.fecha_run || D.fecha_gen;
 
-// KPIs
 document.getElementById('kpiRet6m').textContent = (D.rend.retorno_total > 0 ? '+' : '') + D.rend.retorno_total + '%';
 document.getElementById('kpiCAGR').textContent = ((D.meta.cagr_cartera || 0)*100).toFixed(1) + '%';
 document.getElementById('kpiBetaSPY').textContent = D.meta.beta_cartera_spy || '--';
 document.getElementById('kpiBetaMerv').textContent = D.meta.beta_cartera_merv || '--';
-document.getElementById('kpiVol').textContent = ((D.meta.vol_anual || 0)*100).toFixed(1) + '%';
 document.getElementById('kpiSharpe').textContent = D.meta.sharpe_cartera || '0.0';
 document.getElementById('kpiMaxDD').textContent = ((D.meta.max_dd_1a || 0)*100).toFixed(1) + '%';
 
-// Macro
-const signalsCtx = document.getElementById('macroSignals');
-const sigNames = {{'Curva_10Y2Y':'Curva 10Y/2Y USA','High_Yield':'US High Yield','VIX':'Índice VIX'}};
-const levelColor = {{0:'#10b981', 1:'#f59e0b', 2:'#ef4444', '-1':'#475569'}};
-Object.entries(D.meta.signals_crisis || {{}}).forEach(([k,v]) => {{
-    const div = document.createElement('div');
-    div.className = 'badge-macro';
-    div.innerHTML = `<span>${{sigNames[k]||k}}</span><span style="color:${{levelColor[v]}}">${{v==0?'Normal':v==1?'Elevado':'Crítico'}}</span>`;
-    signalsCtx.appendChild(div);
-}});
 document.getElementById('probCrisisTxt').textContent = ((D.meta.prob_crisis||0)*100).toFixed(0) + '%';
 document.getElementById('confTxt').textContent = (D.meta.confianza_gob||0) + '%';
 document.getElementById('divTxt').textContent = D.meta.divergencia?.tipo || 'Neutral';
 
-// Main Chart
+const colors = ['#258aef', '#10b981', '#64748b'];
+const allocHtml = D.pilares.labels.map((l, i) => `
+    <div class="flex items-center justify-between text-sm">
+        <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${{colors[i]}}"></span> ${{l}}</span>
+        <span class="font-bold">${{D.pilares.valores[i]}}%</span>
+    </div>
+`).join('');
+document.getElementById('allocationList').innerHTML = allocHtml;
+
+new Chart(document.getElementById('chartPilares'), {{
+    type: 'doughnut',
+    data: {{ labels: D.pilares.labels, datasets: [{{ data: D.pilares.valores, backgroundColor: colors, borderWidth:0, cutout: '75%' }}] }},
+    options: {{ maintainAspectRatio:false, plugins:{{ legend:{{display:false}} }} }}
+}});
+
 new Chart(document.getElementById('chartMain'), {{
     type: 'line',
     data: {{
         labels: D.rend.fechas,
         datasets: [
-            {{ label: 'Cartera Sugerida', data: D.rend.cartera, borderColor: '#6366f1', borderWidth: 2.5, pointRadius: 0, tension:0.2, fill: false }},
-            {{ label: 'S&P 500 (USD)', data: D.rend.spy, borderColor: '#94a3b8', borderWidth: 1, borderDash: [5,5], pointRadius: 0, fill: false }},
-            {{ label: 'Merval (USD-CCL)', data: D.rend.merval, borderColor: '#10b981', borderWidth: 1, pointRadius: 0, fill: false }}
+            {{ label: 'Cartera', data: D.rend.cartera, borderColor: '#258aef', borderWidth: 3, pointRadius: 0, tension:0.2, fill: true, backgroundColor:'rgba(37, 138, 239, 0.1)' }},
+            {{ label: 'S&P 500', data: D.rend.spy, borderColor: '#64748b', borderWidth: 1.5, borderDash: [5,5], pointRadius: 0, fill: false }},
+            {{ label: 'Merval (CCL)', data: D.rend.merval, borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0, fill: false }}
         ]
     }},
     options: {{ 
         responsive: true, maintainAspectRatio: false, 
         scales: {{ 
-            y: {{ grid:{{color:'#242b36'}}, ticks:{{callback:v=>(v*100-100).toFixed(0)+'%'}} }},
-            x: {{ grid:{{display:false}}, ticks:{{maxTicksLimit:10}} }}
+            y: {{ grid:{{color:'rgba(255,255,255,0.05)'}}, ticks:{{color:'#94a3b8', callback:v=>(v*100-100).toFixed(0)+'%'}} }},
+            x: {{ grid:{{display:false}}, ticks:{{color:'#94a3b8', maxTicksLimit:8}} }}
         }},
-        plugins: {{ legend: {{ labels: {{ color: '#fff', boxWidth:12 }} }} }}
+        plugins: {{ legend: {{ labels: {{ color: '#f8fafc', boxWidth:12 }} }} }}
     }}
 }});
 
-// Pillars
-new Chart(document.getElementById('chartPilares'), {{
-    type: 'doughnut',
-    data: {{ labels: D.pilares.labels, datasets: [{{ data: D.pilares.valores, backgroundColor: ['#6366f1','#06b6d4','#f59e0b'], borderWidth:0 }}] }},
-    options: {{ maintainAspectRatio:false, plugins:{{ legend:{{position:'bottom', labels:{{color:'#fff', boxWidth:12}}}} }} }}
+const tbodyRV = document.getElementById('tbodyRV');
+D.rv_global.tickers.forEach((t, i) => {{
+    tbodyRV.innerHTML += `<tr class="hover:bg-slate-800/20"><td class="px-6 py-4 font-bold text-primary">${{t}}</td><td class="px-6 py-4 text-slate-400">Global CEDEAR</td><td class="px-6 py-4 font-bold">${{D.rv_global.pesos[i]}}%</td></tr>`;
+}});
+D.rv_local.tickers.forEach((t, i) => {{
+    tbodyRV.innerHTML += `<tr class="hover:bg-slate-800/20"><td class="px-6 py-4 font-bold text-emerald-500">${{t}}</td><td class="px-6 py-4 text-slate-400">Local Merval</td><td class="px-6 py-4 font-bold">${{D.rv_local.pesos[i]}}%</td></tr>`;
 }});
 
-// RV Bar Charts
-const barCfg = (labels, data, color) => ({{
-    type: 'bar', data: {{ labels, datasets: [{{ data, backgroundColor: color, borderRadius: 4 }}] }},
-    options: {{ indexAxis:'y', maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{ x:{{grid:{{display:false}}, ticks:{{callback:v=>v+'%'}} }}, y:{{grid:{{display:false}}}} }} }}
-}});
-new Chart(document.getElementById('chartRVG'), barCfg(D.rv_global.tickers, D.rv_global.pesos, '#06b6d4'));
-new Chart(document.getElementById('chartRVL'), barCfg(D.rv_local.tickers, D.rv_local.pesos, '#6366f1'));
-
-// RF Table
-const tbody = document.getElementById('tbodyRF');
+const tbodyRF = document.getElementById('tbodyRF');
 D.rf_items.forEach(r => {{
-    const row = document.createElement('tr');
     const isPs = r.Instrumento.includes('Pesos');
-    row.innerHTML = `
-        <td><strong style="color:#fff">${{r.Ticker}}</strong></td>
-        <td><span class="pill ${{isPs?'pill-ps':'pill-hd'}}">${{isPs?'PESOS/CER':'USD HD'}}</span></td>
-        <td style="color:${{isPs?'var(--green)':'var(--orange)'}}; font-weight:700;">${{(r.Retorno_Esperado*100).toFixed(1)}}%</td>
-        <td style="color:var(--muted); font-size:11px;">TEM: ${{r.TEM? (r.TEM*100).toFixed(2)+'%':'--'}} / TNA: ${{r.TNA?(r.TNA*100).toFixed(2)+'%':'--'}}</td>
-        <td>${{(r.Peso_Sugerido*100).toFixed(1)}}%</td>
-    `;
-    tbody.appendChild(row);
+    tbodyRF.innerHTML += `
+        <tr class="hover:bg-slate-800/20">
+            <td class="px-6 py-4 font-bold text-amber-500">${{r.Ticker}}</td>
+            <td class="px-6 py-4"><span class="px-2 py-0.5 rounded text-xs font-bold ${{isPs?'bg-emerald-500/20 text-emerald-500':'bg-amber-500/20 text-amber-500'}}">${{isPs?'PESOS/CER':'USD HD'}}</span></td>
+            <td class="px-6 py-4 font-bold text-slate-300">${{(r.Retorno_Esperado*100).toFixed(1)}}%</td>
+            <td class="px-6 py-4 font-bold">${{(r.Peso_Sugerido*100).toFixed(1)}}%</td>
+        </tr>`;
 }});
 </script>
-</body>
-</html>"""
+</body></html>"""
+
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
