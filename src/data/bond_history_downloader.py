@@ -110,7 +110,10 @@ class ScreenermaticHistoryDownloader:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    downloader = ScreenermaticHistoryDownloader('omlop90@gmail.com', 'Perro.Casa$$4282.')
+    import os
+    email = os.getenv("SCREENERMATIC_EMAIL", "tu_correo@ejemplo.com")
+    pwd = os.getenv("SCREENERMATIC_PASSWORD", "tu_contraseña")
+    downloader = ScreenermaticHistoryDownloader(email, pwd)
     for t in ['AL30', 'S31L6']:
         hist = downloader.get_bond_history(t)
         if hist is not None:

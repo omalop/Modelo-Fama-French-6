@@ -9,7 +9,7 @@ import requests
 
 # Configuración de User-Agent para evitar bloqueos (SEC/Yahoo)
 USER_AGENT_HEADERS = {
-    'User-Agent': 'Omar Lopez (omlop90@gmail.com)',
+    'User-Agent': 'Omar Lopez (contacto@ejemplo.com)',
     'Accept-Encoding': 'gzip, deflate',
     'Connection': 'keep-alive'
 }
