@@ -694,22 +694,34 @@ if __name__ == "__main__":
     # Input de inflación esperada para bonos en pesos
     try:
         inflacion_mensual_esperada_str = input(
-            "  📊  Ingrese la inflación mensual esperada para pesos (ej: 2.5 para 2.5%): "
+            "  📊  Ingrese la inflación mensual esperada para pesos (ej: 3.0 para 3.0%): "
         ).strip()
         inflacion_mensual_esperada = float(inflacion_mensual_esperada_str) / 100.0
     except (ValueError, EOFError):
-        inflacion_mensual_esperada = 0.025  # Default: 2.5% mensual
+        inflacion_mensual_esperada = 0.03  # Default: 3.0% mensual
         print(f"  ⚠️  Usando inflación por defecto: {inflacion_mensual_esperada:.1%} mensual")
+
+    # Input de devaluación esperada para estimar Carry Trade
+    try:
+        devalu_mensual_esperada_str = input(
+            "  📊  Ingrese la devaluación mensual esperada del CCL/MEP (ej: 2.0 para 2.0%): "
+        ).strip()
+        devalu_mensual_esperada = float(devalu_mensual_esperada_str) / 100.0
+    except (ValueError, EOFError):
+        devalu_mensual_esperada = 0.02  # Default: 2.0% mensual
+        print(f"  ⚠️  Usando devaluación por defecto: {devalu_mensual_esperada:.1%} mensual")
 
     # Agrupar por segmento y guardar bonos viables para sugerencia
     bonos_viables_hd = []
     bonos_viables_pesos = []
 
-    # Recopilar TEM de pesos para calcular promedio luego
+    # Recopilar TEM nominal de pesos para ponderar el mercado
     tem_pesos_list = []
     for tk, info in yields_bonos.items():
         if info['segmento'] == 'Pesos/CER' and info.get('tem') is not None:
-            tem_pesos_list.append(info['tem'])
+            es_cer = 'CER' in info['desc'] or 'UVA' in info['desc']
+            tem_nom_calc = (info['tem'] + inflacion_mensual_esperada) if es_cer else info['tem']
+            tem_pesos_list.append(tem_nom_calc)
     tem_promedio_mercado = sum(tem_pesos_list) / len(tem_pesos_list) if tem_pesos_list else inflacion_mensual_esperada
 
     for segmento in ['Soberano', 'Subsoberano', 'Corporativo', 'Pesos/CER']:
@@ -753,30 +765,45 @@ if __name__ == "__main__":
                 else:  # Pesos/CER
                     # ----------------------------------------------------
                     # Bonos en Pesos (Carry Trade / CER):
-                    # - TEM debe superar la inflación mensual esperada
-                    # - TEM debe superar el promedio del mercado de bonos pesos
-                    # - MD < 5 (sensibilidad manejable)
+                    # - Ajustar TEM a Nominal si es CER/UVA
+                    # - TEM Nominal > inflación y > 90% prom mercado
+                    # - MD < 5 (sensibilidad manejable para carry)
                     # Referencia: Carry Trade — Brunnermeier et al. (2008)
                     # ----------------------------------------------------
-                    tem_ok = (tem is not None) and (tem > max(inflacion_mensual_esperada, tem_promedio_mercado))
+                    es_cer = 'CER' in info['desc'] or 'UVA' in info['desc']
+                    tem_nominal = (tem + inflacion_mensual_esperada) if tem is not None and es_cer else tem
+                    
+                    tem_ok = (tem_nominal is not None) and (tem_nominal > max(inflacion_mensual_esperada, tem_promedio_mercado * 0.9))
                     es_viable = tem_ok and (md < 5)
                     etiqueta_paridad = f"{paridad:.1f}%" if paridad else "-"
+                    
+                    if es_viable:
+                        tem_usd = (1 + tem_nominal) / (1 + devalu_mensual_esperada) - 1
+                        tir_usd_proyectada = (1 + tem_usd) ** 12 - 1
+                    else:
+                        tir_usd_proyectada = 0.0
 
                 marca = "⭐" if es_viable else "  "
 
-                # Línea de display con TEM para pesos/CER
+                # Línea de display con TEM y Carry para pesos/CER
                 if segmento == 'Pesos/CER' and tem is not None:
-                    print(f"  {marca}  {ticker:<8} {info['desc']:<28}  TIR:{tir:.2%} TEM:{tem:.2%}  MD:{md:.2f}  CVX:{cvx:.2f}  Par:{etiqueta_paridad}")
+                    es_cer = 'CER' in info['desc'] or 'UVA' in info['desc']
+                    tem_nom_print = (tem + inflacion_mensual_esperada) if es_cer else tem
+                    print(f"  {marca}  {ticker:<8} {info['desc']:<28}  TIR:{tir:.2%} TEM_nom:{tem_nom_print:.2%}  MD:{md:.2f}  Par:{etiqueta_paridad}")
+                    if es_viable:
+                        print(f"           ↳ Carry Trade Proyectado en USD: {tir_usd_proyectada:.1%} anual")
                 else:
                     print(f"  {marca}  {ticker:<8} {info['desc']:<28}  TIR:{tir:.2%}  MD:{md:.2f}  CVX:{cvx:.2f}  Par:{etiqueta_paridad}")
 
                 if es_viable:
                     b_dict = {'Ticker': ticker, 'Desc': info['desc'], 'TIR': tir,
                               'MD': md, 'CVX': cvx, 'TEM': tem}
-                    bonos_segmento.append(b_dict)
                     if segmento == 'Pesos/CER':
+                        b_dict['TEM_Nominal'] = tem_nominal
+                        b_dict['TIR_USD_Carry'] = tir_usd_proyectada
                         bonos_viables_pesos.append(b_dict)
                     else:
+                        bonos_segmento.append(b_dict)
                         bonos_viables_hd.append(b_dict)
             else:
                 print(f"       {ticker:<8} {info['desc']:<30}  Sin datos hoy")
@@ -796,14 +823,27 @@ if __name__ == "__main__":
                 print(f"  ↳ Ranking {segmento}: {' > '.join(df_seg['Ticker'].tolist())}")
         print()
 
-    # Pesos en pesos: ranking por TEM descendente
+    # Pesos en pesos: ranking por Carry USD descendente
     if bonos_viables_pesos:
-        bonos_viables_pesos.sort(key=lambda x: x.get('TEM') or 0, reverse=True)
-        print(f"  ↳ Ranking Pesos/CER por TEM: {' > '.join(b['Ticker'] for b in bonos_viables_pesos)}")
-        print(f"  📊  TEM promedio mercado: {tem_promedio_mercado:.2%}  |  Inflación esperada: {inflacion_mensual_esperada:.2%}")
+        bonos_viables_pesos.sort(key=lambda x: x.get('TIR_USD_Carry') or 0, reverse=True)
+        print(f"  ↳ Ranking Pesos/CER por Carry USD: {' > '.join(b['Ticker'] for b in bonos_viables_pesos)}")
+        print(f"  📊  TEM Nom promedio mercado: {tem_promedio_mercado:.2%}  |  Inflación: {inflacion_mensual_esperada:.2%}  |  Devaluación: {devalu_mensual_esperada:.2%}")
 
-    # Distribución Dinámica por Riesgo Político (imagen presidencial)
-    peso_rel_pesos = max(0.1, min(0.9, confianza_gobierno / 100.0))
+    # Distribución Dinámica por Riesgo Político (imagen presidencial) y Carry Trade
+    peso_base_pesos = confianza_gobierno / 100.0
+    carry_spread = 0.0
+    
+    if bonos_viables_pesos and bonos_viables_hd:
+        mejor_tir_usd_pesos = bonos_viables_pesos[0]['TIR_USD_Carry']
+        mejor_tir_hd = max(b['TIR'] for b in bonos_viables_hd)
+        carry_spread = mejor_tir_usd_pesos - mejor_tir_hd
+        
+        # Ajuste elástico: cada 10% de spread a favor de pesos suma 20% al allocation
+        ajuste_carry = carry_spread * 2.0 
+        peso_rel_pesos = max(0.1, min(0.9, peso_base_pesos + ajuste_carry))
+    else:
+        peso_rel_pesos = peso_base_pesos
+        
     peso_rel_hd = 1.0 - peso_rel_pesos
     
     if not bonos_viables_pesos and bonos_viables_hd:
@@ -814,10 +854,11 @@ if __name__ == "__main__":
     peso_rf_pesos = alloc['RF_Local'] * peso_rel_pesos
     peso_rf_hd = alloc['RF_Local'] * peso_rel_hd
     
-    print(f"  ⚖️  Ajuste por Imagen Presidencial ({confianza_gobierno}%):")
+    print(f"  ⚖️  Ajuste por Imagen Presidencial ({confianza_gobierno}%) y Carry Trade:")
+    print(f"      → Spread Carry vs HD: {carry_spread:+.2%} (Mejor Carry USD vs Mejor TIR HD)")
     print(f"      → Ponderación Renta Fija: {peso_rel_pesos*100:.1f}% Pesos/CER | {peso_rel_hd*100:.1f}% Hard Dollar")
     print(f"      → Horizonte estratégico: ~6 años (gobierno Milei). Revisar si hay cambio político.")
-    print(f"  ℹ️  Estrategia: Buy & Hold. Revisar mensualmente.")
+    print(f"  ℹ️  Estrategia: Ajustar CER si Inflación > Devaluación (Breakeven superado).")
     print(f"  ℹ️  Los GD (ley NY) se sugieren SOLO si spread vs AL > 30 bps.")
 
     # ─── EXPORTACIÓN A CSV ────────────────────────────────────────────
