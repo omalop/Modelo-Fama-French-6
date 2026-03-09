@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Cartera — Modelo Fama-French 6</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #0b0e14;
+    --card: #151921;
+    --border: #242b36;
+    --accent: #6366f1;
+    --accent2: #06b6d4;
+    --green: #10b981;
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 14px; padding: 24px; line-height: 1.5; }
+.container { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+.header { grid-column: span 12; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.header .date { color: var(--muted); font-size: 11px; }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; position: relative; }
+.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 8px; }
+
+/* KPIs */
+.kpi-row { grid-column: span 12; display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; }
+.kpi-card { text-align: center; display: flex; flex-direction: column; justify-content: center; height: 100px; }
+.kpi-val { font-size: 26px; font-weight: 700; display: block; }
+.kpi-label { color: var(--muted); font-size: 10px; text-transform: uppercase; margin-top: 4px; }
+
+.span-8 { grid-column: span 8; }
+.span-4 { grid-column: span 4; }
+.span-6 { grid-column: span 6; }
+.chart-h { height: 280px; position: relative; }
+
+/* Tables */
+.tabla { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tabla th { text-align: left; padding: 10px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); font-size: 10px; text-transform: uppercase; }
+.tabla td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.02); }
+.pill { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+.pill-hd { background: rgba(245,158,11,0.1); color: var(--orange); }
+.pill-ps { background: rgba(16,185,129,0.1); color: var(--green); }
+
+.badge-macro { background: rgba(255,255,255,0.03); padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Portfolio Optimizer Pro <span style="color:var(--accent)">v6.2</span></h1>
+        <div class="date">Último Run: <span id="runDate"></span></div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+        <div class="card kpi-card">
+            <span class="kpi-val" id="kpiRet6m" style="color:var(--green)">0%</span>
+            <span class="kpi-label">Retorno 6M (USD)</span>
+        </div>
+        <div class="card kpi-card" title="CAGR Anualizado Histórico 1A">
+            <span class="kpi-val" id="kpiCAGR" style="color:var(--accent2)">0%</span>
+            <span class="kpi-label">CAGR (1A)</span>
+        </div>
+        <div class="card kpi-card">
+            <span class="kpi-val" id="kpiBetaSPY">0.00</span>
+            <span class="kpi-label">Beta SPY</span>
+        </div>
+        <div class="card kpi-card">
+            <span class="kpi-val" id="kpiBetaMerv">0.00</span>
+            <span class="kpi-label">Beta MERV</span>
+        </div>
+        <div class="card kpi-card">
+            <span class="kpi-val" id="kpiVol" style="color:var(--muted)">0%</span>
+            <span class="kpi-label">Volatilidad</span>
+        </div>
+        <div class="card kpi-card">
+            <span class="kpi-val" id="kpiSharpe" style="color:#a5b4fc">0.0</span>
+            <span class="kpi-label">Sharpe Ratio</span>
+        </div>
+        <div class="card kpi-card">
+            <span class="kpi-val" id="kpiMaxDD" style="color:var(--red)">0%</span>
+            <span class="kpi-label">Max Drawdown</span>
+        </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="card span-8">
+        <div class="card-header">📈 Rendimiento Proyectado 6M vs Benchmarks (USD)</div>
+        <div class="chart-h"><canvas id="chartMain"></canvas></div>
+    </div>
+
+    <!-- MACRO -->
+    <div class="card span-4">
+        <div class="card-header">🚦 Señales Macro y Escenario</div>
+        <div id="macroSignals"></div>
+        <div style="margin-top:16px;">
+            <div class="badge-macro"><span>Prob. Crisis Sistémica</span><span id="probCrisisTxt" style="font-weight:700;">0%</span></div>
+            <div class="badge-macro"><span>Confianza Gobierno</span><span id="confTxt" style="font-weight:700; color:var(--accent2);">0%</span></div>
+            <div class="badge-macro"><span>Divergencia RF/RV</span><span id="divTxt" style="font-weight:700;">Neutral</span></div>
+        </div>
+    </div>
+
+    <!-- PILLARS -->
+    <div class="card span-4">
+        <div class="card-header">🎯 Distribución por Pilares</div>
+        <div style="height:250px;"><canvas id="chartPilares"></canvas></div>
+    </div>
+
+    <!-- BONDS -->
+    <div class="card span-8">
+        <div class="card-header">🛡️ Renta Fija Sugerida</div>
+        <table class="tabla">
+            <thead>
+                <tr><th>Ticker</th><th>Tipo</th><th>Tir (%)</th><th>TEM / TNA</th><th>Peso</th></tr>
+            </thead>
+            <tbody id="tbodyRF"></tbody>
+        </table>
+    </div>
+
+    <!-- RV TABLES -->
+    <div class="card span-6">
+        <div class="card-header">🌎 RV Global (Unificado)</div>
+        <div class="chart-h"><canvas id="chartRVG"></canvas></div>
+    </div>
+    <div class="card span-6">
+        <div class="card-header">🇦🇷 RV Local (Argentina)</div>
+        <div class="chart-h"><canvas id="chartRVL"></canvas></div>
+    </div>
+</div>
+
+<script>
+const D = {"pilares": {"labels": ["RV Local", "RV Global", "Renta Fija"], "valores": [65.0, 15.0, 20.0]}, "rv_local": {"tickers": ["GBAN.BA", "VALO.BA", "TRAN.BA", "DGCU2.BA", "TGNO4.BA", "YPFD.BA", "TGSU2.BA"], "pesos": [12.0, 10.9, 9.1, 8.8, 8.8, 7.8, 7.6]}, "rv_global": {"tickers": ["PBR", "TEN", "BG", "PSX", "CL", "EBAY", "LMT", "AMGN", "0902.HK", "MSI", "HAL", "DTE.DE", "MUFG", "TIIAY"], "pesos": [1.9, 1.2, 1.2, 1.1, 1.1, 1.1, 1.0, 1.0, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9]}, "rf_items": [{"Ticker": "TZX28", "Instrumento": "RF_Local_Pesos (BONCER 2028 (CER))", "Peso_Sugerido": 0.0464, "Retorno_Esperado": 0.0851, "TEM": 0.0338, "TNA": 0.0851}, {"Ticker": "TZXD7", "Instrumento": "RF_Local_Pesos (BONCER Dic-27 (CER))", "Peso_Sugerido": 0.0464, "Retorno_Esperado": 0.0757, "TEM": 0.0331, "TNA": 0.0757}, {"Ticker": "TZXD6", "Instrumento": "RF_Local_Pesos (BONCER Dic-26 (CER))", "Peso_Sugerido": 0.0464, "Retorno_Esperado": 0.0516, "TEM": 0.0312, "TNA": 0.0516}, {"Ticker": "AL30", "Instrumento": "RF_Local_HD (Soberano HD Ley Arg CP)", "Peso_Sugerido": 0.0202, "Retorno_Esperado": 0.0983, "TEM": 0.0078, "TNA": 0.0983}, {"Ticker": "AE38", "Instrumento": "RF_Local_HD (Soberano HD Ley Arg LP)", "Peso_Sugerido": 0.0202, "Retorno_Esperado": 0.1071, "TEM": 0.0085, "TNA": 0.1071}, {"Ticker": "AL35", "Instrumento": "RF_Local_HD (Soberano HD Ley Arg (35))", "Peso_Sugerido": 0.0202, "Retorno_Esperado": 0.1029, "TEM": 0.0082, "TNA": 0.1029}], "embi": {"fechas": ["2025-01-01", "2025-01-02", "2025-01-03", "2025-01-06", "2025-01-07", "2025-01-08", "2025-01-09", "2025-01-10", "2025-01-13", "2025-01-14", "2025-01-15", "2025-01-16", "2025-01-17", "2025-01-20", "2025-01-21", "2025-01-22", "2025-01-23", "2025-01-24", "2025-01-27", "2025-01-28", "2025-01-29", "2025-01-30", "2025-01-31", "2025-02-03", "2025-02-04", "2025-02-05", "2025-02-06", "2025-02-07", "2025-02-10", "2025-02-11", "2025-02-12", "2025-02-13", "2025-02-14", "2025-02-17", "2025-02-18", "2025-02-19", "2025-02-20", "2025-02-21", "2025-02-24", "2025-02-25", "2025-02-26", "2025-02-27", "2025-02-28", "2025-03-03", "2025-03-04", "2025-03-05", "2025-03-06", "2025-03-07", "2025-03-10", "2025-03-11", "2025-03-12", "2025-03-13", "2025-03-14", "2025-03-17", "2025-03-18", "2025-03-19", "2025-03-20", "2025-03-21", "2025-03-25", "2025-03-26", "2025-03-27", "2025-03-28", "2025-03-31", "2025-04-01", "2025-04-02", "2025-04-03", "2025-04-04", "2025-04-07", "2025-04-08", "2025-04-09", "2025-04-10", "2025-04-11", "2025-04-14", "2025-04-15", "2025-04-16", "2025-04-17", "2025-04-18", "2025-04-21", "2025-04-22", "2025-04-23", "2025-04-24", "2025-04-25", "2025-04-28", "2025-04-29", "2025-04-30", "2025-05-01", "2025-05-02", "2025-05-05", "2025-05-06", "2025-05-07", "2025-05-08", "2025-05-09", "2025-05-12", "2025-05-13", "2025-05-14", "2025-05-15", "2025-05-16", "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23", "2025-05-26", "2025-05-27", "2025-05-28", "2025-05-29", "2025-06-03", "2025-06-04", "2025-06-05", "2025-06-06", "2025-06-09", "2025-06-10", "2025-06-11", "2025-06-12", "2025-06-13", "2025-06-16", "2025-06-17", "2025-06-18", "2025-06-23", "2025-06-24", "2025-06-25", "2025-06-26", "2025-06-27", "2025-06-30", "2025-07-01", "2025-07-02", "2025-07-03", "2025-07-07", "2025-07-08", "2025-07-09", "2025-07-10", "2025-07-11", "2025-07-15", "2025-07-16", "2025-07-17", "2025-07-18", "2025-07-21", "2025-07-22", "2025-07-23", "2025-07-24", "2025-07-25", "2025-07-28", "2025-07-29", "2025-07-30", "2025-07-31", "2025-08-01", "2025-08-04", "2025-08-05", "2025-08-06", "2025-08-07", "2025-08-08", "2025-08-11", "2025-08-12", "2025-08-13", "2025-08-14", "2025-08-15", "2025-08-18", "2025-08-19", "2025-08-20", "2025-08-21", "2025-08-22", "2025-08-25", "2025-08-26", "2025-08-27", "2025-08-28", "2025-08-29", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05", "2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-27", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-06", "2025-10-07", "2025-10-08", "2025-10-09", "2025-10-10", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-27", "2025-11-28", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-25", "2025-12-26", "2025-12-29", "2025-12-30", "2025-12-31", "2026-01-01", "2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-19", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06"], "valores": [635.0, 610.0, 610.0, 569.0, 561.0, 572.0, 560.0, 580.0, 589.0, 579.0, 597.0, 626.0, 644.0, 641.0, 638.0, 640.0, 646.0, 631.0, 642.0, 634.0, 611.0, 614.0, 618.0, 632.0, 640.0, 660.0, 659.0, 660.0, 677.0, 710.0, 673.0, 675.0, 675.0, 675.0, 696.0, 719.0, 719.0, 720.0, 730.0, 748.0, 749.0, 769.0, 780.0, 780.0, 780.0, 717.0, 714.0, 692.0, 723.0, 723.0, 718.0, 748.0, 737.0, 750.0, 787.0, 777.0, 762.0, 769.0, 761.0, 769.0, 759.0, 797.0, 816.0, 823.0, 823.0, 872.0, 925.0, 960.0, 978.0, 889.0, 899.0, 874.0, 896.0, 725.0, 745.0, 745.0, 726.0, 720.0, 720.0, 720.0, 713.0, 692.0, 710.0, 701.0, 726.0, 735.0, 741.0, 741.0, 741.0, 766.0, 678.0, 678.0, 650.0, 651.0, 648.0, 676.0, 676.0, 675.0, 663.0, 661.0, 665.0, 665.0, 666.0, 666.0, 655.0, 663.0, 668.0, 688.0, 688.0, 691.0, 686.0, 655.0, 668.0, 678.0, 688.0, 687.0, 714.0, 726.0, 719.0, 681.0, 687.0, 685.0, 677.0, 701.0, 699.0, 700.0, 679.0, 698.0, 704.0, 692.0, 700.0, 717.0, 736.0, 748.0, 770.0, 759.0, 763.0, 775.0, 773.0, 753.0, 734.0, 719.0, 727.0, 716.0, 730.0, 771.0, 761.0, 743.0, 735.0, 728.0, 733.0, 724.0, 722.0, 711.0, 712.0, 709.0, 706.0, 700.0, 747.0, 753.0, 767.0, 829.0, 850.0, 853.0, 837.0, 829.0, 898.0, 893.0, 901.0, 906.0, 1108.0, 1070.0, 1024.0, 1047.0, 1140.0, 1231.0, 1167.0, 1246.0, 1456.0, 1456.0, 1089.0, 1018.0, 898.0, 973.0, 1060.0, 1060.0, 1115.0, 1222.0, 1264.0, 1264.0, 1165.0, 1080.0, 1016.0, 1074.0, 1071.0, 932.0, 932.0, 1026.0, 1004.0, 1029.0, 1089.0, 1048.0, 1075.0, 1123.0, 1081.0, 1081.0, 708.0, 685.0, 666.0, 676.0, 657.0, 665.0, 660.0, 621.0, 638.0, 647.0, 599.0, 598.0, 605.0, 616.0, 612.0, 616.0, 614.0, 601.0, 620.0, 651.0, 635.0, 656.0, 652.0, 653.0, 648.0, 648.0, 647.0, 639.0, 634.0, 627.0, 633.0, 634.0, 628.0, 634.0, 624.0, 602.0, 573.0, 569.0, 568.0, 573.0, 570.0, 575.0, 575.0, 575.0, 580.0, 571.0, 569.0, 571.0, 571.0, 553.0, 566.0, 566.0, 575.0, 579.0, 566.0, 577.0, 581.0, 586.0, 571.0, 564.0, 566.0, 569.0, 562.0, 546.0, 526.0, 513.0, 494.0, 484.0, 492.0, 496.0, 495.0, 503.0, 502.0, 516.0, 512.0, 502.0, 507.0, 506.0, 514.0, 519.0, 519.0, 511.0, 515.0, 524.0, 519.0, 537.0, 545.0, 545.0, 554.0, 572.0, 567.0, 573.0, 534.0, 546.0, 575.0]}, "rend": {"fechas": ["2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-06", "2025-10-07", "2025-10-08", "2025-10-09", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-25", "2025-11-26", "2025-11-28", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30", "2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09"], "cartera": [1.0, 1.0029, 1.043, 1.0308, 0.9822, 0.9594, 0.9726, 0.9484, 0.8543, 0.8404, 0.9836, 1.0352, 1.1143, 1.052, 1.0112, 0.9889, 0.9465, 0.9278, 0.964, 0.9814, 0.98, 0.9428, 0.9509, 1.101, 1.1014, 1.0365, 1.0485, 1.035, 1.0075, 0.9813, 0.9604, 0.9554, 0.992, 0.9974, 1.2668, 1.3044, 1.3859, 1.3371, 1.4017, 1.425, 1.3981, 1.4503, 1.4203, 1.4603, 1.5028, 1.5218, 1.5201, 1.5005, 1.5229, 1.5359, 1.5454, 1.54, 1.482, 1.4446, 1.462, 1.4931, 1.557, 1.5452, 1.5266, 1.5669, 1.5848, 1.5711, 1.5492, 1.5973, 1.5946, 1.5673, 1.5955, 1.5673, 1.5432, 1.5943, 1.6031, 1.6055, 1.6084, 1.6214, 1.6195, 1.5647, 1.5582, 1.5126, 1.54, 1.4929, 1.4828, 1.5397, 1.5415, 1.5149, 1.5212, 1.4833, 1.4955, 1.5166, 1.5059, 1.5716, 1.5581, 1.5751, 1.6171, 1.6583, 1.6393, 1.6593, 1.6321, 1.6131, 1.6193, 1.5881, 1.5018, 1.576, 1.6008, 1.5982, 1.6238, 1.5251, 1.6011, 1.575, 1.596, 1.5885, 1.553, 1.5606, 1.53, 1.5054, 1.4906, 1.5231, 1.4687, 1.503, 1.5026, 1.5171, 1.5245], "spy": [1.0, 1.0027, 1.0057, 1.0142, 1.0137, 1.0185, 1.0172, 1.0162, 1.0211, 1.0261, 1.0306, 1.0249, 1.022, 1.0169, 1.0229, 1.0256, 1.0298, 1.0333, 1.0339, 1.034, 1.0377, 1.0338, 1.0398, 1.0369, 1.0246, 1.023, 1.0271, 1.0206, 1.026, 1.0369, 1.037, 1.0314, 1.0375, 1.0457, 1.0585, 1.0609, 1.0609, 1.0504, 1.0531, 1.0549, 1.0426, 1.0464, 1.0347, 1.036, 1.0519, 1.0541, 1.0548, 1.0373, 1.0368, 1.0273, 1.0188, 1.0226, 1.0067, 1.0166, 1.0417, 1.0489, 1.0545, 1.0489, 1.0515, 1.0546, 1.0557, 1.0578, 1.0532, 1.0603, 1.0625, 1.0512, 1.0495, 1.047, 1.0348, 1.043, 1.0522, 1.059, 1.0638, 1.0673, 1.0669, 1.0632, 1.0618, 1.0559, 1.0626, 1.0692, 1.0656, 1.0656, 1.0725, 1.0742, 1.0721, 1.0664, 1.0692, 1.0685, 1.0465, 1.0586, 1.0644, 1.0647, 1.0701, 1.0744, 1.0743, 1.073, 1.0683, 1.0741, 1.0651, 1.0597, 1.0467, 1.0673, 1.0723, 1.0688, 1.0687, 1.052, 1.0525, 1.0595, 1.0565, 1.0638, 1.0527, 1.0608, 1.0694, 1.0637, 1.0591, 1.0595, 1.0495, 1.0576, 1.0517, 1.0377, 1.0312], "merval": [1.0, 1.0062, 1.0603, 1.0434, 0.9991, 0.9908, 1.0185, 0.9999, 0.9224, 0.9109, 1.0524, 1.0686, 1.1101, 1.0535, 1.0204, 1.0046, 0.9659, 0.9419, 0.9788, 0.9941, 0.9974, 0.9602, 0.981, 1.1633, 1.1365, 1.081, 1.108, 1.1034, 1.089, 1.0589, 1.0509, 1.05, 1.104, 1.1078, 1.4647, 1.5264, 1.6335, 1.5682, 1.6772, 1.7208, 1.6867, 1.7155, 1.6521, 1.6443, 1.6768, 1.6743, 1.683, 1.6518, 1.6701, 1.6467, 1.649, 1.6312, 1.5807, 1.5237, 1.5688, 1.6269, 1.7099, 1.6812, 1.6427, 1.7122, 1.704, 1.6584, 1.6264, 1.6837, 1.6569, 1.6362, 1.6727, 1.6428, 1.6172, 1.7112, 1.6966, 1.6969, 1.7017, 1.7106, 1.724, 1.697, 1.6842, 1.6722, 1.7234, 1.6513, 1.6207, 1.6996, 1.7041, 1.6797, 1.6662, 1.6169, 1.5926, 1.6206, 1.6042, 1.6941, 1.6993, 1.7081, 1.7349, 1.7957, 1.7815, 1.803, 1.7714, 1.7318, 1.7355, 1.6983, 1.5715, 1.6372, 1.6657, 1.6934, 1.687, 1.5514, 1.6093, 1.5764, 1.643, 1.6552, 1.6026, 1.6247, 1.6042, 1.5589, 1.5065, 1.5146, 1.4581, 1.4785, 1.4762, 1.4857, 1.4715], "retorno_total": 52.45}, "meta": {"confianza_gob": 56.0, "inflacion_previa": 0.028999999999999998, "inflacion_esperada": 0.027000000000000003, "devalu_esperada": 0.02, "signals_crisis": {"Curva_10Y2Y": 0, "High_Yield": 0, "VIX": 1}, "prob_crisis": 0.1, "divergencia": {"tipo": "Neutral", "impacto_rv": 0.0, "mensaje": "Correlación macro consistente. GGAL 1A: -21.8% | EMBI 1A: -19.9%"}, "beta_cartera_spy": 1.028, "beta_cartera_merv": 0.563, "vol_anual": 0.3364, "cagr_cartera": 0.4318, "sharpe_cartera": 1.16, "max_dd_1a": -0.2303, "fecha_run": "09/03/2026 14:46"}, "fecha_gen": "09/03/2026 14:46"};
+document.getElementById('runDate').textContent = D.meta.fecha_run || D.fecha_gen;
+
+// KPIs
+document.getElementById('kpiRet6m').textContent = (D.rend.retorno_total > 0 ? '+' : '') + D.rend.retorno_total + '%';
+document.getElementById('kpiCAGR').textContent = ((D.meta.cagr_cartera || 0)*100).toFixed(1) + '%';
+document.getElementById('kpiBetaSPY').textContent = D.meta.beta_cartera_spy || '--';
+document.getElementById('kpiBetaMerv').textContent = D.meta.beta_cartera_merv || '--';
+document.getElementById('kpiVol').textContent = ((D.meta.vol_anual || 0)*100).toFixed(1) + '%';
+document.getElementById('kpiSharpe').textContent = D.meta.sharpe_cartera || '0.0';
+document.getElementById('kpiMaxDD').textContent = ((D.meta.max_dd_1a || 0)*100).toFixed(1) + '%';
+
+// Macro
+const signalsCtx = document.getElementById('macroSignals');
+const sigNames = {'Curva_10Y2Y':'Curva 10Y/2Y USA','High_Yield':'US High Yield','VIX':'Índice VIX'};
+const levelColor = {0:'#10b981', 1:'#f59e0b', 2:'#ef4444', '-1':'#475569'};
+Object.entries(D.meta.signals_crisis || {}).forEach(([k,v]) => {
+    const div = document.createElement('div');
+    div.className = 'badge-macro';
+    div.innerHTML = `<span>${sigNames[k]||k}</span><span style="color:${levelColor[v]}">${v==0?'Normal':v==1?'Elevado':'Crítico'}</span>`;
+    signalsCtx.appendChild(div);
+});
+document.getElementById('probCrisisTxt').textContent = ((D.meta.prob_crisis||0)*100).toFixed(0) + '%';
+document.getElementById('confTxt').textContent = (D.meta.confianza_gob||0) + '%';
+document.getElementById('divTxt').textContent = D.meta.divergencia?.tipo || 'Neutral';
+
+// Main Chart
+new Chart(document.getElementById('chartMain'), {
+    type: 'line',
+    data: {
+        labels: D.rend.fechas,
+        datasets: [
+            { label: 'Cartera Sugerida', data: D.rend.cartera, borderColor: '#6366f1', borderWidth: 2.5, pointRadius: 0, tension:0.2, fill: false },
+            { label: 'S&P 500 (USD)', data: D.rend.spy, borderColor: '#94a3b8', borderWidth: 1, borderDash: [5,5], pointRadius: 0, fill: false },
+            { label: 'Merval (USD-CCL)', data: D.rend.merval, borderColor: '#10b981', borderWidth: 1, pointRadius: 0, fill: false }
+        ]
+    },
+    options: { 
+        responsive: true, maintainAspectRatio: false, 
+        scales: { 
+            y: { grid:{color:'#242b36'}, ticks:{callback:v=>(v*100-100).toFixed(0)+'%'} },
+            x: { grid:{display:false}, ticks:{maxTicksLimit:10} }
+        },
+        plugins: { legend: { labels: { color: '#fff', boxWidth:12 } } }
+    }
+});
+
+// Pillars
+new Chart(document.getElementById('chartPilares'), {
+    type: 'doughnut',
+    data: { labels: D.pilares.labels, datasets: [{ data: D.pilares.valores, backgroundColor: ['#6366f1','#06b6d4','#f59e0b'], borderWidth:0 }] },
+    options: { maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{color:'#fff', boxWidth:12}} } }
+});
+
+// RV Bar Charts
+const barCfg = (labels, data, color) => ({
+    type: 'bar', data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 4 }] },
+    options: { indexAxis:'y', maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{display:false}, ticks:{callback:v=>v+'%'} }, y:{grid:{display:false}} } }
+});
+new Chart(document.getElementById('chartRVG'), barCfg(D.rv_global.tickers, D.rv_global.pesos, '#06b6d4'));
+new Chart(document.getElementById('chartRVL'), barCfg(D.rv_local.tickers, D.rv_local.pesos, '#6366f1'));
+
+// RF Table
+const tbody = document.getElementById('tbodyRF');
+D.rf_items.forEach(r => {
+    const row = document.createElement('tr');
+    const isPs = r.Instrumento.includes('Pesos');
+    row.innerHTML = `
+        <td><strong style="color:#fff">${r.Ticker}</strong></td>
+        <td><span class="pill ${isPs?'pill-ps':'pill-hd'}">${isPs?'PESOS/CER':'USD HD'}</span></td>
+        <td style="color:${isPs?'var(--green)':'var(--orange)'}; font-weight:700;">${(r.Retorno_Esperado*100).toFixed(1)}%</td>
+        <td style="color:var(--muted); font-size:11px;">TEM: ${r.TEM? (r.TEM*100).toFixed(2)+'%':'--'} / TNA: ${r.TNA?(r.TNA*100).toFixed(2)+'%':'--'}</td>
+        <td>${(r.Peso_Sugerido*100).toFixed(1)}%</td>
+    `;
+    tbody.appendChild(row);
+});
+</script>
+</body>
+</html>
