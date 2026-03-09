@@ -1,0 +1,22 @@
+{
+    "confianza_gob": 56.0,
+    "inflacion_previa": 0.028999999999999998,
+    "inflacion_esperada": 0.027000000000000003,
+    "devalu_esperada": 0.02,
+    "signals_crisis": {
+        "Curva_10Y2Y": 0,
+        "High_Yield": 0,
+        "VIX": 1
+    },
+    "prob_crisis": 0.1,
+    "divergencia": {
+        "tipo": "Neutral",
+        "impacto_rv": 0.0,
+        "mensaje": "Correlaci\u00f3n macro consistente. GGAL 1A: -21.7% | EMBI 1A: -19.9%"
+    },
+    "beta_cartera": 1.027,
+    "vol_anual": 0.3365,
+    "sharpe_cartera": 1.18,
+    "max_dd_1a": -0.2303,
+    "fecha_run": "09/03/2026 12:44"
+}

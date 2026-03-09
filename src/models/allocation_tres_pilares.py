@@ -25,6 +25,7 @@ import sys
 import logging
 import importlib.util
 import warnings
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -601,6 +602,36 @@ if __name__ == "__main__":
     print(f"   P/E LOCAL  ({n_arg} ARG):      {pe_arg:.1f}x  →  E/P: {1/pe_arg:.2%}")
     print(f"   P/E GLOBAL ({n_global} Unif.): {pe_global:.1f}x  →  E/P: {1/pe_global:.2%}")
 
+    # --- PARÁMETROS MACRO ---
+    print(f"\n{SEP}")
+    print("📊 CONFIGURACIÓN DE ESCENARIO MACRO")
+    print(f"{SEP}")
+    try:
+        conf_str = input("  🏛️  Imagen/Confianza en el Gobierno (0-100, ej: 56): ").strip()
+        confianza_gobierno = float(conf_str) if conf_str else 56.0
+    except (ValueError, EOFError):
+        confianza_gobierno = 56.0
+    
+    try:
+        inf_previa_str = input("  📈  Inflación del mes previo (ej: 2.9): ").strip()
+        inflacion_mensual_previa = float(inf_previa_str)/100.0 if inf_previa_str else 0.029
+    except (ValueError, EOFError):
+        inflacion_mensual_previa = 0.029
+
+    try:
+        inf_exp_str = input("  📈  Inflación mensual esperada (ej: 2.7): ").strip()
+        inflacion_mensual_esperada = float(inf_exp_str)/100.0 if inf_exp_str else 0.027
+    except (ValueError, EOFError):
+        inflacion_mensual_esperada = 0.027
+
+    try:
+        dev_str = input("  💵  Devaluación mensual CCL esperada (ej: 2.0): ").strip()
+        devalu_mensual_esperada = float(dev_str)/100.0 if dev_str else 0.02
+    except (ValueError, EOFError):
+        devalu_mensual_esperada = 0.02
+    
+    print(f"  ✅ Escenario: Confianza {confianza_gobierno}% | Infla {inflacion_mensual_esperada:.1%} | Devalu {devalu_mensual_esperada:.1%}")
+
     # ── 4. Tasa de descuento + Crisis ───────────────────────────────
     print("\n🚦 [4/5] Tasa de descuento + señales de crisis...")
     tasa_dto, tasa_label = obtener_tasa_descuento(df_bonos)
@@ -691,25 +722,7 @@ if __name__ == "__main__":
     print(f"  📡  Treasury 10Y: {treasury_10y:.2%}  |  EMBI+: {embi_actual:.0f} pts")
     print(f"  📏  TIR HD mínima aceptable: {tir_hd_min:.2%} (±1% tolerancia)")
 
-    # Input de inflación esperada para bonos en pesos
-    try:
-        inflacion_mensual_esperada_str = input(
-            "  📊  Ingrese la inflación mensual esperada para pesos (ej: 3.0 para 3.0%): "
-        ).strip()
-        inflacion_mensual_esperada = float(inflacion_mensual_esperada_str) / 100.0
-    except (ValueError, EOFError):
-        inflacion_mensual_esperada = 0.03  # Default: 3.0% mensual
-        print(f"  ⚠️  Usando inflación por defecto: {inflacion_mensual_esperada:.1%} mensual")
-
-    # Input de devaluación esperada para estimar Carry Trade
-    try:
-        devalu_mensual_esperada_str = input(
-            "  📊  Ingrese la devaluación mensual esperada del CCL/MEP (ej: 2.0 para 2.0%): "
-        ).strip()
-        devalu_mensual_esperada = float(devalu_mensual_esperada_str) / 100.0
-    except (ValueError, EOFError):
-        devalu_mensual_esperada = 0.02  # Default: 2.0% mensual
-        print(f"  ⚠️  Usando devaluación por defecto: {devalu_mensual_esperada:.1%} mensual")
+    # Los inputs ya fueron solicitados arriba en el bloque de Escenario Macro
 
     # Agrupar por segmento y guardar bonos viables para sugerencia
     bonos_viables_hd = []
@@ -891,7 +904,9 @@ if __name__ == "__main__":
                         'Ticker': b['Ticker'],
                         'Instrumento': f"RF_Local_Pesos ({b['Desc']})",
                         'Peso_Sugerido': round(peso_por_bono, 4),
-                        'Retorno_Esperado': round(b['TIR'], 4)
+                        'Retorno_Esperado': round(b['TIR'], 4),
+                        'TEM': round(b.get('TEM_Nominal', b['TEM']), 4),
+                        'TNA': round(b['TIR'], 4)  # TIR como proxy de TNA
                     })
             if bonos_viables_hd:
                 peso_por_bono = peso_rf_hd / len(bonos_viables_hd)
@@ -900,7 +915,9 @@ if __name__ == "__main__":
                         'Ticker': b['Ticker'],
                         'Instrumento': f"RF_Local_HD ({b['Desc']})",
                         'Peso_Sugerido': round(peso_por_bono, 4),
-                        'Retorno_Esperado': round(b['TIR'], 4)
+                        'Retorno_Esperado': round(b['TIR'], 4),
+                        'TEM': round((1+b['TIR'])**(1/12)-1, 4),
+                        'TNA': round(b['TIR'], 4)
                     })
         else:
             # Fallback si no hay bonos viables > 7%
@@ -908,10 +925,15 @@ if __name__ == "__main__":
                 'Ticker': 'RF_RESERVA',
                 'Instrumento': 'Renta_Fija_Reserva',
                 'Peso_Sugerido': round(alloc['RF_Local'], 4),
-                'Retorno_Esperado': round(tasa_dto, 4)
+                'Retorno_Esperado': round(tasa_dto, 4),
+                'TEM': round((1+tasa_dto)**(1/12)-1, 4),
+                'TNA': round(tasa_dto, 4)
             })
 
     df_cartera = pd.DataFrame(cartera_csv)
+    # Rellenar NaNs para activos de RV
+    df_cartera['TEM'] = df_cartera['TEM'].fillna(0)
+    df_cartera['TNA'] = df_cartera['TNA'].fillna(0)
     output_path = os.path.join(ROOT_DIR, 'data/processed/Portfolio_Recommendation.csv')
     df_cartera.to_csv(output_path, index=False)
     print(f"\n📁 Recomendación de Cartera exportada a: {output_path}")
@@ -1010,10 +1032,23 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"  ⚡  Beta Cartera: Error ({e})")
 
-    # Max Drawdown de la cartera (basado en retornos históricos ponderados)
+    vol_anual = 0
+    sharpe_cartera = 0
+    max_dd = 0
+    
+    # Max Drawdown y Volatilidad de la cartera (basado en retornos históricos ponderados)
     try:
         if tickers_rv and pesos_rv:
             retornos_df = pd.DataFrame()
+            # Descargar SPY para alinear fechas
+            spy_base = yf.download("^GSPC", period="1y", progress=False)
+            if isinstance(spy_base.columns, pd.MultiIndex):
+                spy_base = spy_base.xs('Close', level='Price', axis=1).squeeze()
+            else:
+                spy_base = spy_base['Close']
+            
+            common_index = spy_base.index
+            
             for ticker, peso in zip(tickers_rv, pesos_rv):
                 try:
                     hist_t = yf.download(ticker, period="1y", progress=False)
@@ -1021,18 +1056,53 @@ if __name__ == "__main__":
                         close_t = hist_t.xs('Close', level='Price', axis=1).squeeze()
                     else:
                         close_t = hist_t['Close']
-                    retornos_df[ticker] = close_t.pct_change().fillna(0) * peso
+                    ret_t = close_t.pct_change().reindex(common_index).fillna(0)
+                    retornos_df[ticker] = ret_t * peso
                 except Exception:
                     pass
 
             if not retornos_df.empty:
                 retorno_cartera_dia = retornos_df.sum(axis=1)
+                # Volatilidad Anualizada
+                vol_diaria = retorno_cartera_dia.std()
+                vol_anual = vol_diaria * np.sqrt(252)
+                
+                # Sharpe (Risk Free = 4.0% anual aprox)
+                rf_anual = 0.04
+                ret_total_cartera = (1 + retorno_cartera_dia).cumprod().iloc[-1] - 1
+                sharpe_cartera = (ret_total_cartera - rf_anual) / vol_anual if vol_anual > 0 else 0
+                
                 nav = (1 + retorno_cartera_dia).cumprod()
                 max_nav = nav.cummax()
                 drawdown = (nav - max_nav) / max_nav
                 max_dd = drawdown.min()
+                
+                print(f"  ⚡  Volatilidad (1A):     {vol_anual:.2%}")
+                print(f"  ⚡  Sharpe Ratio:         {sharpe_cartera:.2f}")
                 print(f"  📉  Max Drawdown (1A):   {max_dd:.2%}")
     except Exception as e:
-        print(f"  📉  Max Drawdown: Error ({e})")
+        print(f"  📉  Métricas de Riesgo: Error ({e})")
+
+    # --- EXPORTAR METADATOS PARA DASHBOARD ---
+    import json
+    # --- EXPORTAR METADATOS PARA DASHBOARD ---
+    import json
+    metadata = {
+        "confianza_gob": confianza_gobierno,
+        "inflacion_previa": inflacion_mensual_previa,
+        "inflacion_esperada": inflacion_mensual_esperada,
+        "devalu_esperada": devalu_mensual_esperada,
+        "signals_crisis": signals,
+        "prob_crisis": prob_c,
+        "divergencia": divergencia,
+        "beta_cartera": round(beta_cartera, 3) if 'beta_cartera' in locals() else 0,
+        "vol_anual": round(vol_anual, 4),
+        "sharpe_cartera": round(sharpe_cartera, 2),
+        "max_dd_1a": round(max_dd, 4),
+        "fecha_run": datetime.now().strftime("%d/%m/%Y %H:%M")
+    }
+    meta_path = os.path.join(ROOT_DIR, 'data/processed/Metadata_Allocation.json')
+    with open(meta_path, 'w') as f:
+        json.dump(metadata, f, indent=4)
 
     print(f"{SEP}\n")

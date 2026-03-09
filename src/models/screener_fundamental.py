@@ -770,17 +770,36 @@ def main():
     parser.add_argument('--modo', choices=['all', 'sec', 'global', 'arg'], default='all')
     args = parser.parse_args()
     
+    sec_path = os.path.join(ROOT_DIR, 'data/processed/Ranking_Global_SEC_Top.xlsx')
+    intl_path = os.path.join(ROOT_DIR, 'data/processed/Ranking_Global_Intl_Top.xlsx')
+    unif_path = os.path.join(ROOT_DIR, 'data/processed/Ranking_Global_Unificado_Todos.xlsx')
+    arg_path  = os.path.join(ROOT_DIR, 'data/processed/Ranking_Argentina_Top.xlsx')
+
     if args.modo in ('all', 'sec'):
-        # 1. Ranking SEC (EE.UU. — Fuente Oficial)
-        run_screener('config/ticker_sec.txt', 'global_sec', 'data/processed/Ranking_Global_SEC_Top.xlsx', fuente='sec')
+        run_screener('config/ticker_sec.txt', 'global_sec', sec_path, fuente='sec')
 
     if args.modo in ('all', 'global'):
-        # 2. Ranking Global (Resto del Mundo — Fuente YFinance)
-        run_screener('config/ticker_global.txt', 'global_intl', 'data/processed/Ranking_Global_Intl_Top.xlsx', fuente='yfinance')
+        run_screener('config/ticker_global.txt', 'global_intl', intl_path, fuente='yfinance')
     
+    # UNIFICACIÓN DE GLOBALES
+    if (args.modo == 'all') or (args.modo in ('sec', 'global') and os.path.exists(sec_path) and os.path.exists(intl_path)):
+        print("\n>>> UNIFICANDO RANKINGS GLOBALES (SEC + INTL)...")
+        try:
+            df_sec  = pd.read_excel(sec_path) if os.path.exists(sec_path) else pd.DataFrame()
+            df_intl = pd.read_excel(intl_path) if os.path.exists(intl_path) else pd.DataFrame()
+            if not df_sec.empty or not df_intl.empty:
+                df_unif = pd.concat([df_sec, df_intl], ignore_index=True)
+                # Eliminar duplicados si hay (por ticker)
+                df_unif = df_unif.drop_duplicates(subset=['Ticker'])
+                df_unif = df_unif.sort_values(by='Final_Score', ascending=False)
+                df_unif.to_excel(unif_path, index=False)
+                print(f"✅ Ranking UNIFICADO guardado en: {unif_path}")
+                print(f"   Total activos: {len(df_unif)}")
+        except Exception as e:
+            print(f"❌ Error al unificar: {e}")
+
     if args.modo in ('all', 'arg'):
-        # 3. Ranking Argentina (Local — Fuente YFinance + CCL)
-        run_screener('config/ticker_arg.txt', 'argentina', 'data/processed/Ranking_Argentina_Top.xlsx', fuente='yfinance')
+        run_screener('config/ticker_arg.txt', 'argentina', arg_path, fuente='yfinance')
     
     print("\n" + "="*50)
     print("PROCESO FINALIZADO. REVISE LOS ARCHIVOS OUTPUT.")
