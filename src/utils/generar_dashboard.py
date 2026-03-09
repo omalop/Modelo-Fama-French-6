@@ -29,7 +29,7 @@ RAIZ           = Path(__file__).resolve().parents[2]
 DB_PATH        = RAIZ / "data" / "docta_cache.duckdb"
 CSV_CARTERA    = RAIZ / "data" / "processed" / "Portfolio_Recommendation.csv"
 JSON_METADATA  = RAIZ / "data" / "processed" / "Metadata_Allocation.json"
-SALIDA_HTML    = RAIZ / "data" / "processed" / "Dashboard_Final.html"
+SALIDA_HTML    = RAIZ / "index.html"
 
 WATCHLIST_MOMENTUM = {
     "BHIP.BA": {"sector": "Financial Services", "ff_score": 0.89, "motivo": "Precio < MA52 (corrección técnica)"},
