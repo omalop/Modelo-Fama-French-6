@@ -80,8 +80,8 @@ BONOS_PESOS_CER     = {"S31L6": "LECAP Jul-26 (ARS)",
                        "TZX28": "BONCER 2028 (CER)"}
 
 # PHPSESSID actualizado para Screenermatic (renovar cuando expire)
-# Actualizado: 2026-03-09
-_PHPSESSID_ACTUAL = "89a157e4f517dfdfa789c64cc6ce858b"
+# Actualizado: 2026-03-20
+_PHPSESSID_ACTUAL = "ed408b4795997a1f44ef7d1f1c2a2ff7"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
