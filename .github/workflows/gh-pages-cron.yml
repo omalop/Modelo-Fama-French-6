@@ -32,9 +32,7 @@ jobs:
         SCREENERMATIC_EMAIL: ${{ secrets.SCREENERMATIC_EMAIL }}
         SCREENERMATIC_PASSWORD: ${{ secrets.SCREENERMATIC_PASSWORD }}
       run: |
-        # Ejecuta el script de optimización si existe
-        if [ -f src/models/optimizador_cartera.py ]; then python src/models/optimizador_cartera.py; fi
-        # Ejecuta el generador principal de interfaz
+        # Solo ejecuta el generador principal del dashboard (no-interactivo)
         python src/utils/generar_dashboard.py
 
     - name: Commit and push if changed
