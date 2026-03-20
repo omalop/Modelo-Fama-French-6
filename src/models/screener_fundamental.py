@@ -7,6 +7,8 @@ import warnings
 from datetime import datetime, timedelta
 
 # Configuración de Logging Científico (Artículo 5)
+import os
+os.makedirs('logs', exist_ok=True)  # Crear carpeta si no existe (necesario en CI/CD)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',

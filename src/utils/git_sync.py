@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 
 # Configuración de logging
+os.makedirs('logs', exist_ok=True)  # Crear carpeta si no existe (necesario en CI/CD)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
